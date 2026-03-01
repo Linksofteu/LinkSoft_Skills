@@ -70,6 +70,14 @@ Recommended additional files:
 - `name` (lowercase, hyphenated)
 - `description` (clear trigger/use-case)
 
+Recommended metadata field:
+
+```yaml
+metadata:
+  author: Your Name or Handle
+  version: 1.0.0
+```
+
 See the [Agent Skills specification](https://agentskills.io/specification) for more detail.
 
 ### Skill Quality Checklist

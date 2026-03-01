@@ -12,6 +12,14 @@ See `CONTRIBUTING.md` for contribution guidelines.
 2. Add a `SKILL.md` file with YAML frontmatter:
 
    - Required fields: `name`, `description`
+   - Recommended metadata field:
+
+     ```yaml
+     metadata:
+       author: Your Name or Handle
+       version: 1.0.0
+     ```
+
    - Recommended naming: lowercase with hyphens (for example, `my-new-skill`)
 
 3. Write clear instructions in `SKILL.md`:
@@ -35,6 +43,8 @@ See `CONTRIBUTING.md` for contribution guidelines.
 
    - `npx skills add . --list` to confirm the skill is discoverable
    - `npx skills add . --skill <skill-name>` to verify install flow
+
+See the [Agent Skills specification](https://agentskills.io/specification) for much more detail on how to correctly structure your skills.
 
 ## Licensing
 
