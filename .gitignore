@@ -1,0 +1,71 @@
+# -------------------------------
+# IDEs and editor settings
+# -------------------------------
+.idea/
+.vscode/
+.vs/
+.fleet/
+.history/
+*.code-workspace
+
+# JetBrains
+*.iml
+*.ipr
+*.iws
+out/
+
+# Visual Studio / VS Code
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Vim / Emacs / swap files
+*.swp
+*.swo
+*~
+
+# -------------------------------
+# OS-generated files
+# -------------------------------
+.DS_Store
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# -------------------------------
+# Local env and secrets
+# -------------------------------
+.env
+.env.*
+*.local
+
+# -------------------------------
+# Logs, temp, and runtime output
+# -------------------------------
+*.log
+*.tmp
+*.temp
+tmp/
+temp/
+
+# -------------------------------
+# Common dependency/build artifacts
+# (useful for a mixed-language skills repo)
+# -------------------------------
+node_modules/
+dist/
+build/
+coverage/
+
+# Python caches and virtual environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Misc tool caches
+.cache/
