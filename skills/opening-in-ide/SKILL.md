@@ -1,26 +1,30 @@
 ---
 name: opening-in-ide
-description: Opens a file or folder in JetBrains Rider or Visual Studio Code using the nearest workspace or project context when available. Use when the user asks to open code in Rider, VS Code, or a generic IDE from the CLI.
+description: Opens a file or folder in a supported IDE using the nearest workspace or project context when available. Use when the user asks to open code in Rider, VS Code, or a generic IDE from the CLI.
 license: MIT
 compatibility: Intended for OpenCode/Codex-style agents on Linux, macOS, or Windows. Requires Bash or PowerShell plus supported IDE CLIs on PATH (`rider` on Unix-like systems; `rider`, `rider.bat`, or `rider64.exe` on Windows; `code` on Unix-like systems; `code` or `code.cmd` on Windows).
 metadata:
   author: David Orolin
-  version: "0.8.0"
+  version: "0.9.0"
 ---
 
 ## Purpose
 
-Use this skill when the user wants to open a file or project in JetBrains Rider or Visual Studio Code from the CLI, while preserving solution, project, or workspace context when possible.
+Use this skill when the user wants to open a file or project in a supported IDE from the CLI, while preserving solution, project, or workspace context when possible.
 
 ## Behavior
 
 1. Accept a file or directory path (default `.`) and an optional line number.
-2. When the user names `Rider` or `VS Code`, use the matching launcher only.
+2. When the user names a specific supported IDE, use the matching launcher only.
 3. When the user asks for a generic IDE:
    - Run the installed-IDE detection script for the current platform.
    - If no supported IDE is installed, report that none of the supported IDEs are available.
    - If exactly one supported IDE is installed, use it without asking.
-   - If both supported IDEs are installed, ask the user which one to use.
+   - If multiple supported IDEs are installed, ask the user which one to use.
+   - Prefer an interactive multi-choice prompt when the runtime supports it.
+   - Populate the choices from the detected installed IDEs instead of hardcoding a fixed set.
+   - If the runtime does not support interactive choices, ask a single concise text question listing the available installed IDEs.
+   - Do not guess when multiple valid installed IDEs are available and the user did not specify one.
 4. If the user explicitly requests an IDE that is not installed, return a clear error and do not fall back to another IDE.
 5. Launch the chosen IDE in non-blocking mode (fire-and-forget) so the terminal session is not held open.
 
@@ -65,7 +69,8 @@ Examples:
 
 ## Notes
 
-- Supported IDE identifiers are `rider` and `code`.
+- Current supported IDE identifiers are `rider` and `code`.
 - The detection scripts print one installed IDE per line and succeed even when none are installed.
 - Rider requires CLI availability on `PATH` (`rider` on Unix-like systems; `rider`, `rider.bat`, or `rider64.exe` on Windows).
 - VS Code requires CLI availability on `PATH` (`code` on Unix-like systems; `code` or `code.cmd` on Windows).
+- When more IDEs are added later, keep the generic-selection flow data-driven: detect installed IDEs, present only valid installed options, and preserve the same interactive-choice-then-fallback behavior.
