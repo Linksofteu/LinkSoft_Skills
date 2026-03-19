@@ -28,7 +28,7 @@
    - **Minimum:** Uses the matching launcher without asking
    - **Quality criteria:**
      - Does not prompt the user unnecessarily
-     - Chooses only from `rider` or `code`
+      - Chooses only from detected supported IDE identifiers such as `rider`, `webstorm`, `code`, `cursor`, or `windsurf`
 
 ---
 
@@ -41,10 +41,58 @@
 **Expected behaviors:**
 
 1. Asks the user to choose an IDE
-   - **Minimum:** Prompts when both `rider` and `code` are installed
+    - **Minimum:** Prompts when two or more supported IDEs are installed
+    - **Quality criteria:**
+      - Mentions only installed supported IDEs
+      - Does not choose one silently
+
+---
+
+## Scenario: Explicit WebStorm request when WebStorm is installed
+
+**Difficulty:** Easy
+
+**Query:** Open `src/app.ts` in WebStorm.
+
+**Expected behaviors:**
+
+1. Uses WebStorm launcher
+   - **Minimum:** Runs `scripts/open-in-webstorm.sh` (Linux/macOS) or `scripts/open-in-webstorm.ps1` (Windows)
    - **Quality criteria:**
-     - Mentions only installed supported IDEs
-     - Does not choose one silently
+     - Selects the script matching host OS and shell
+     - Uses nearest `.idea` or JavaScript/TypeScript project-root context when available
+
+---
+
+## Scenario: Explicit WebStorm request when WebStorm is not installed
+
+**Difficulty:** Easy
+
+**Query:** Open `src/app.ts` in WebStorm.
+
+**Expected behaviors:**
+
+1. Returns WebStorm-specific error
+   - **Minimum:** Reports that WebStorm is unavailable
+   - **Quality criteria:**
+     - Does not fall back to Rider or a VS Code-family IDE
+     - Mentions expected WebStorm command names
+
+---
+
+## Scenario: WebStorm prefers `.idea` context over package markers
+
+**Difficulty:** Medium
+
+**Query:** Open `src/app.ts` in WebStorm inside a repo containing both `.idea` and `package.json`.
+
+**Expected behaviors:**
+
+1. Uses nearest `.idea` directory first
+   - **Minimum:** Opens the directory containing `.idea`
+   - **Quality criteria:**
+     - Checks for `.idea` before other JavaScript or TypeScript markers
+     - Includes the requested file when the target is a file
 
 ## Scenario: Open file in nearest solution
 
@@ -212,6 +260,38 @@
 
 ---
 
+## Scenario: Explicit Cursor request when Cursor is installed
+
+**Difficulty:** Easy
+
+**Query:** Open `src/MyFile.cs` at line `120` in Cursor.
+
+**Expected behaviors:**
+
+1. Uses Cursor launcher
+   - **Minimum:** Runs `scripts/open-in-cursor.sh` (Linux/macOS) or `scripts/open-in-cursor.ps1` (Windows)
+   - **Quality criteria:**
+     - Reuses VS Code-family context selection behavior
+     - Uses `--goto` for file-and-line opens
+
+---
+
+## Scenario: Explicit Windsurf request when Windsurf is installed
+
+**Difficulty:** Easy
+
+**Query:** Open `src/MyFile.cs` in Windsurf.
+
+**Expected behaviors:**
+
+1. Uses Windsurf launcher
+   - **Minimum:** Runs `scripts/open-in-windsurf.sh` (Linux/macOS) or `scripts/open-in-windsurf.ps1` (Windows)
+   - **Quality criteria:**
+     - Reuses VS Code-family context selection behavior
+     - Preserves workspace or project-folder context when available
+
+---
+
 ## Scenario: Rider CLI missing
 
 **Difficulty:** Edge-case
@@ -241,6 +321,23 @@
    - **Quality criteria:**
      - Passes `path:line` in VS Code format
      - Preserves workspace or project-folder context when available
+
+---
+
+## Scenario: Cursor or Windsurf CLI missing
+
+**Difficulty:** Edge-case
+
+**Query:** Open `src/MyFile.cs` in Cursor or Windsurf on a machine without that CLI on PATH.
+
+**Expected behaviors:**
+
+1. Fails with IDE-specific error
+   - **Minimum:** Returns non-zero exit
+   - **Quality criteria:**
+      - Error names the requested IDE
+      - Error mentions expected command names
+      - Does not fall back to another editor in the same family
 
 ---
 
@@ -289,4 +386,4 @@
    - **Minimum:** Returns non-zero exit with file-not-found style message
    - **Quality criteria:**
       - Includes the invalid path in the error
-      - Does not invoke Rider or VS Code when path is invalid
+      - Does not invoke the requested IDE when path is invalid

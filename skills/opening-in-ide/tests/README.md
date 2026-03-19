@@ -9,12 +9,12 @@ This folder contains both the human-readable scenario list and a runnable harnes
 
 ## Why this harness exists
 
-The launcher scripts depend on external commands such as `rider`, `code`, `bash`, and `pwsh`. Running ad hoc checks against a developer machine can accidentally hit real installed IDE CLIs and produce misleading results.
+The launcher scripts depend on external commands such as `rider`, `webstorm`, `code`, `cursor`, `windsurf`, `bash`, and `pwsh`. Running ad hoc checks against a developer machine can accidentally hit real installed IDE CLIs and produce misleading results.
 
 This harness avoids that by:
 
 - creating a temporary fixture tree under `/tmp`
-- injecting fake `rider` and `code` commands into a controlled `PATH`
+- injecting fake `rider`, `webstorm`, `code`, `cursor`, and `windsurf` commands into a controlled `PATH`
 - forcing a minimal `PATH` for missing-CLI scenarios
 - capturing launcher arguments instead of launching real IDEs
 
@@ -22,11 +22,12 @@ This harness avoids that by:
 
 The harness exercises these script behaviors:
 
-- IDE detection for none installed, one installed, and both installed
-- Rider launch behavior for nearest `.sln`, `.csproj` fallback, direct open, directory open, and line numbers
-- VS Code launch behavior for nearest `.code-workspace`, `.sln` directory fallback, `.csproj` directory fallback, direct open, and `--goto`
+- data-driven IDE detection for none installed, one installed, and all supported editors installed
+- Rider launch behavior for nearest `.sln`, `.csproj` fallback, and line numbers
+- WebStorm launch behavior for `.idea` and package-root context selection
+- VS Code family launch behavior for nearest `.code-workspace`, `.sln` directory fallback, `.csproj` directory fallback, direct open, and `--goto`
 - invalid line handling and invalid path handling
-- representative Bash and PowerShell launch paths
+- representative Bash and PowerShell launch paths for every supported family
 - explicit missing-CLI failure paths
 
 It complements `scenarios.md`; it does not replace it.
@@ -38,7 +39,7 @@ It complements `scenarios.md`; it does not replace it.
 - `bash`
 - `pwsh`
 
-The harness does not require real Rider or VS Code installations.
+The harness does not require real IDE installations.
 
 ## Usage
 
@@ -53,7 +54,7 @@ The script prints a JSON summary like:
 ```json
 {
   "base": "/tmp/opening-in-ide-tests-xxxxxx",
-  "passed": 29,
+  "passed": 34,
   "failed": 0,
   "failures": []
 }
@@ -64,4 +65,4 @@ The process exits with code `0` when all checks pass and `1` when any check fail
 ## Notes
 
 - The temporary fixture directory is left in place to make failures easier to inspect.
-- The harness currently focuses on script-level behavior, not agent-level prompting logic.
+- The harness focuses on script-level behavior, not agent-level prompting logic.

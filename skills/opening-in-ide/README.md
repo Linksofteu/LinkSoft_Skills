@@ -1,6 +1,6 @@
 # opening-in-ide
 
-Open a file or folder in JetBrains Rider or Visual Studio Code from an agent workflow, using the nearest workspace or project context when available.
+Open a file or folder in JetBrains Rider, JetBrains WebStorm, Visual Studio Code, Cursor, or Windsurf from an agent workflow, using the nearest workspace or project context when available.
 
 The launchers are non-blocking (fire-and-forget) so terminal-based agents can continue immediately after the IDE opens.
 
@@ -11,17 +11,27 @@ The launchers are non-blocking (fire-and-forget) so terminal-based agents can co
 - `scripts/list-installed-ides.ps1`: Windows PowerShell supported-IDE detection
 - `scripts/open-in-rider.sh`: Linux/macOS Rider launcher
 - `scripts/open-in-rider.ps1`: Windows PowerShell Rider launcher
+- `scripts/open-in-webstorm.sh`: Linux/macOS WebStorm launcher
+- `scripts/open-in-webstorm.ps1`: Windows PowerShell WebStorm launcher
 - `scripts/open-in-code.sh`: Linux/macOS VS Code launcher
 - `scripts/open-in-code.ps1`: Windows PowerShell VS Code launcher
+- `scripts/open-in-cursor.sh`: Linux/macOS Cursor launcher
+- `scripts/open-in-cursor.ps1`: Windows PowerShell Cursor launcher
+- `scripts/open-in-windsurf.sh`: Linux/macOS Windsurf launcher
+- `scripts/open-in-windsurf.ps1`: Windows PowerShell Windsurf launcher
+- `scripts/lib/*`: shared Bash and PowerShell launcher helpers
 - `tests/scenarios.md`: Behavior and edge-case test scenarios
 - `tests/run-harness.py`: Runnable isolated validation harness
 - `tests/README.md`: Test coverage and harness usage notes
 
 ## Prerequisites
 
-- One or both supported IDEs installed:
+- One or more supported IDEs installed:
   - JetBrains Rider with `rider` on Unix-like systems, or `rider`, `rider.bat`, or `rider64.exe` on Windows
+  - JetBrains WebStorm with `webstorm` on Unix-like systems, or `webstorm`, `webstorm.bat`, or `webstorm64.exe` on Windows
   - Visual Studio Code with `code` on Unix-like systems, or `code` or `code.cmd` on Windows
+  - Cursor with `cursor` on Unix-like systems, or `cursor` or `cursor.cmd` on Windows
+  - Windsurf with `windsurf` on Unix-like systems, or `windsurf` or `windsurf.cmd` on Windows
 
 ## Generic IDE selection
 
@@ -30,9 +40,9 @@ When a request says "open in IDE" without naming an IDE:
 1. Detect installed supported IDEs with the platform-appropriate `list-installed-ides` script.
 2. If none are installed, return a clear error.
 3. If exactly one is installed, use it directly.
-4. If both are installed, ask the user which installed IDE to use.
+4. If multiple are installed, ask the user which installed IDE to use.
 
-When a request explicitly asks for Rider or VS Code, use only that IDE and return a clear error if its CLI is unavailable.
+When a request explicitly asks for Rider, WebStorm, VS Code, Cursor, or Windsurf, use only that IDE and return a clear error if its CLI is unavailable.
 
 ## Usage
 
@@ -54,6 +64,24 @@ Open in VS Code on Linux/macOS:
 ./skills/opening-in-ide/scripts/open-in-code.sh <path> [--line <n>]
 ```
 
+Open in WebStorm on Linux/macOS:
+
+```bash
+./skills/opening-in-ide/scripts/open-in-webstorm.sh <path> [--line <n>]
+```
+
+Open in Cursor on Linux/macOS:
+
+```bash
+./skills/opening-in-ide/scripts/open-in-cursor.sh <path> [--line <n>]
+```
+
+Open in Windsurf on Linux/macOS:
+
+```bash
+./skills/opening-in-ide/scripts/open-in-windsurf.sh <path> [--line <n>]
+```
+
 Detect supported IDEs on Windows (PowerShell):
 
 ```powershell
@@ -72,13 +100,34 @@ Open in VS Code on Windows (PowerShell):
 ./skills/opening-in-ide/scripts/open-in-code.ps1 <path> [--line <n>]
 ```
 
+Open in WebStorm on Windows (PowerShell):
+
+```powershell
+./skills/opening-in-ide/scripts/open-in-webstorm.ps1 <path> [--line <n>]
+```
+
+Open in Cursor on Windows (PowerShell):
+
+```powershell
+./skills/opening-in-ide/scripts/open-in-cursor.ps1 <path> [--line <n>]
+```
+
+Open in Windsurf on Windows (PowerShell):
+
+```powershell
+./skills/opening-in-ide/scripts/open-in-windsurf.ps1 <path> [--line <n>]
+```
+
 Examples:
 
 ```bash
 ./skills/opening-in-ide/scripts/list-installed-ides.sh
 ./skills/opening-in-ide/scripts/open-in-rider.sh src/MyFile.cs
 ./skills/opening-in-ide/scripts/open-in-rider.sh src/MyFile.cs --line 120
+./skills/opening-in-ide/scripts/open-in-webstorm.sh src/app.ts --line 42
 ./skills/opening-in-ide/scripts/open-in-code.sh src/MyFile.cs --line 120
+./skills/opening-in-ide/scripts/open-in-cursor.sh src/MyFile.cs --line 120
+./skills/opening-in-ide/scripts/open-in-windsurf.sh .
 ./skills/opening-in-ide/scripts/open-in-code.sh .
 ```
 
@@ -86,7 +135,10 @@ Examples:
 ./skills/opening-in-ide/scripts/list-installed-ides.ps1
 ./skills/opening-in-ide/scripts/open-in-rider.ps1 src/MyFile.cs
 ./skills/opening-in-ide/scripts/open-in-rider.ps1 src/MyFile.cs --line 120
+./skills/opening-in-ide/scripts/open-in-webstorm.ps1 src/app.ts --line 42
 ./skills/opening-in-ide/scripts/open-in-code.ps1 src/MyFile.cs --line 120
+./skills/opening-in-ide/scripts/open-in-cursor.ps1 src/MyFile.cs --line 120
+./skills/opening-in-ide/scripts/open-in-windsurf.ps1 .
 ./skills/opening-in-ide/scripts/open-in-code.ps1 .
 ```
 
@@ -116,10 +168,26 @@ When multiple `.code-workspace`/`.sln`/`.csproj` files exist in a directory:
 - Prefer the one whose basename matches the directory name
 - Otherwise choose alphabetically
 
+### WebStorm
+
+1. Search upward from the target path for nearest `.idea` directory
+2. If no `.idea` exists, search upward for nearest JavaScript or TypeScript project root such as `package.json`, `pnpm-workspace.yaml`, `yarn.lock`, `package-lock.json`, `bun.lock`, `bun.lockb`, `tsconfig.json`, or `jsconfig.json`
+3. If neither exists, open the target directly
+4. When opening a file at a line, use JetBrains `--line`
+
+### Cursor and Windsurf
+
+1. Follow the same context-selection rules as VS Code
+2. Use `--goto` for file-and-line opens
+3. Keep workspace behavior identical across the VS Code family
+
 ## Troubleshooting
 
 - `Rider CLI not found on PATH`: configure Rider launcher in IDE settings and restart shell
+- `WebStorm CLI not found on PATH`: configure the WebStorm launcher in IDE settings and restart shell
 - `VS Code CLI not found on PATH`: install the `code` shell command and restart shell
+- `Cursor CLI not found on PATH`: install or enable the `cursor` shell command and restart shell
+- `Windsurf CLI not found on PATH`: install or enable the `windsurf` shell command and restart shell
 - `path does not exist`: verify the provided file/folder path
 - `--line must be a positive integer`: pass values like `1`, `120`, `999`
 
