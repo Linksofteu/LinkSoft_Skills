@@ -14,6 +14,8 @@ The launchers are non-blocking (fire-and-forget) so terminal-based agents can co
 - `scripts/open-in-code.sh`: Linux/macOS VS Code launcher
 - `scripts/open-in-code.ps1`: Windows PowerShell VS Code launcher
 - `tests/scenarios.md`: Behavior and edge-case test scenarios
+- `tests/run-harness.py`: Runnable isolated validation harness
+- `tests/README.md`: Test coverage and harness usage notes
 
 ## Prerequisites
 
@@ -120,3 +122,15 @@ When multiple `.code-workspace`/`.sln`/`.csproj` files exist in a directory:
 - `VS Code CLI not found on PATH`: install the `code` shell command and restart shell
 - `path does not exist`: verify the provided file/folder path
 - `--line must be a positive integer`: pass values like `1`, `120`, `999`
+
+## Tests
+
+Human-readable scenarios live in `skills/opening-in-ide/tests/scenarios.md`.
+
+To run the isolated script harness:
+
+```bash
+python3 skills/opening-in-ide/tests/run-harness.py
+```
+
+See `skills/opening-in-ide/tests/README.md` for coverage and harness details.

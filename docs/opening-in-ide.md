@@ -84,8 +84,10 @@ The implementation updates:
 - `skills/opening-in-ide/SKILL.md`
 - `skills/opening-in-ide/README.md`
 - `skills/opening-in-ide/tests/scenarios.md`
+- `skills/opening-in-ide/tests/run-harness.py`
+- `skills/opening-in-ide/tests/README.md`
 
-Those files now describe the broader skill trigger, generic IDE selection flow, explicit missing-IDE behavior, launcher layout, and the new versioned skill metadata.
+Those files now describe the broader skill trigger, generic IDE selection flow, explicit missing-IDE behavior, launcher layout, the reusable isolated test harness, and the new versioned skill metadata.
 
 ## Validation guidance
 
