@@ -226,7 +226,7 @@ class Harness:
         self.assert_failure("bash", "open-in-rider.sh", 127, "Rider CLI not found", "bash rider missing cli", target)
         self.assert_failure("bash", "open-in-rider.sh", 2, "--line must be a positive integer", "bash rider invalid line", target, "--line", "abc", extra_path=self.bin_dir)
 
-        self.assert_launch("bash", "open-in-webstorm.sh", "webstorm", f"{self.webstorm_pkg} {webstorm_pkg_target}", "bash webstorm package context", webstorm_pkg_target, extra_path=self.bin_dir)
+        self.assert_launch("bash", "open-in-webstorm.sh", "webstorm", f"{self.webstorm_pkg} --line 1 {webstorm_pkg_target}", "bash webstorm package context", webstorm_pkg_target, extra_path=self.bin_dir)
         self.assert_launch("bash", "open-in-webstorm.sh", "webstorm", f"{self.webstorm_idea} --line 9 {webstorm_idea_target}", "bash webstorm idea context line open", webstorm_idea_target, "--line", "9", extra_path=self.bin_dir)
         self.assert_failure("bash", "open-in-webstorm.sh", 127, "WebStorm CLI not found", "bash webstorm missing cli", webstorm_pkg_target)
 
@@ -248,7 +248,7 @@ class Harness:
         (self.root / "repo.sln").write_text("\n", encoding="utf-8")
 
         self.assert_launch("pwsh", "open-in-rider.ps1", "rider", f"{self.root / 'repo.sln'} {target}", "pwsh rider nearest sln", target, extra_path=self.bin_dir)
-        self.assert_launch("pwsh", "open-in-webstorm.ps1", "webstorm", f"{self.webstorm_idea} {webstorm_idea_target}", "pwsh webstorm idea context", webstorm_idea_target, extra_path=self.bin_dir)
+        self.assert_launch("pwsh", "open-in-webstorm.ps1", "webstorm", f"{self.webstorm_idea} --line 1 {webstorm_idea_target}", "pwsh webstorm idea context", webstorm_idea_target, extra_path=self.bin_dir)
         self.assert_launch("pwsh", "open-in-code.ps1", "code", f"{self.root / 'repo.code-workspace'} {target}", "pwsh code workspace context", target, extra_path=self.bin_dir)
         self.assert_launch("pwsh", "open-in-cursor.ps1", "cursor", f"{self.root / 'repo.code-workspace'} --goto {target}:41", "pwsh cursor goto line", target, "--line", "41", extra_path=self.bin_dir)
         self.assert_launch("pwsh", "open-in-windsurf.ps1", "windsurf", f"{self.root / 'repo.code-workspace'} {target}", "pwsh windsurf workspace context", target, extra_path=self.bin_dir)
