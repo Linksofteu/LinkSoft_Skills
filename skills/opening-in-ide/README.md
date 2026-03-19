@@ -174,6 +174,7 @@ When multiple `.code-workspace`/`.sln`/`.csproj` files exist in a directory:
 2. If no `.idea` exists, search upward for nearest JavaScript or TypeScript project root such as `package.json`, `pnpm-workspace.yaml`, `yarn.lock`, `package-lock.json`, `bun.lock`, `bun.lockb`, `tsconfig.json`, or `jsconfig.json`
 3. If neither exists, open the target directly
 4. When opening a file at a line, use JetBrains `--line`
+5. When opening a file without an explicit line in project context, fall back to line `1` so the file tab opens reliably
 
 ### Cursor and Windsurf
 

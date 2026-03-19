@@ -121,11 +121,16 @@ function Open-WithJetBrainsContext {
         [Parameter(Mandatory = $true)][string]$Target,
         [Parameter(Mandatory = $false)][int]$Line,
         [Parameter(Mandatory = $true)][string]$CommandPath
-    )
+)
 
     if ($OpenMode -eq 'file') {
-        if ($Line) {
-            Start-JetBrainsDetached -FilePath $CommandPath -Arguments @($ContextPath, '--line', "$Line", $Target)
+        $effectiveLine = $Line
+        if ((-not $effectiveLine) -and $script:ContextMode -eq 'webstorm') {
+            $effectiveLine = 1
+        }
+
+        if ($effectiveLine) {
+            Start-JetBrainsDetached -FilePath $CommandPath -Arguments @($ContextPath, '--line', "$effectiveLine", $Target)
         }
 
         Start-JetBrainsDetached -FilePath $CommandPath -Arguments @($ContextPath, $Target)

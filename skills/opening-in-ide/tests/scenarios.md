@@ -91,8 +91,9 @@
 1. Uses nearest `.idea` directory first
    - **Minimum:** Opens the directory containing `.idea`
    - **Quality criteria:**
-     - Checks for `.idea` before other JavaScript or TypeScript markers
-     - Includes the requested file when the target is a file
+      - Checks for `.idea` before other JavaScript or TypeScript markers
+      - Includes the requested file when the target is a file
+      - Still opens the file when no explicit line number was requested
 
 ## Scenario: Open file in nearest solution
 

@@ -143,12 +143,18 @@ parse_args() {
 
 open_with_context() {
   local context_path="$1"
+  local effective_line="$line"
 
   if [[ "$open_mode" == "file" ]]; then
-    if [[ -n "$line" ]]; then
-      launch_ide "$context_path" --line "$line" "$target"
+    if [[ -z "$effective_line" && "$context_mode" == "webstorm" ]]; then
+      effective_line="1"
+    fi
+
+    if [[ -n "$effective_line" ]]; then
+      launch_ide "$context_path" --line "$effective_line" "$target"
       exit 0
     fi
+
     launch_ide "$context_path" "$target"
     exit 0
   fi
