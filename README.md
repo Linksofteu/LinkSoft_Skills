@@ -11,14 +11,13 @@ See `CONTRIBUTING.md` for contribution guidelines.
 
 2. Add a `SKILL.md` file with YAML frontmatter:
 
-   - Required fields: `name`, `description`
-   - Recommended metadata field:
+   - Required fields: `name`, `description`, and `metadata` in this shape:
 
-     ```yaml
-     metadata:
-       author: Your Name or Handle
-       version: 1.0.0
-     ```
+      ```yaml
+      metadata:
+        author: Your Name or Handle
+        version: 1.0.0
+      ```
 
    - Recommended naming: lowercase with hyphens (for example, `my-new-skill`)
 
@@ -30,9 +29,10 @@ See `CONTRIBUTING.md` for contribution guidelines.
 
 4. Add supporting assets as needed:
 
-   - `scripts/` for helper scripts
-   - `README.md` for usage notes
-   - `tests/` for scenarios/examples
+    - `scripts/` for helper scripts
+    - `references/` for on-demand documentation
+    - `evals/evals.json` for skill evaluation
+    - `README.md` for human-facing usage notes
 
 5. Set licensing for the skill:
 

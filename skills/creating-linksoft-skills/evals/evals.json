@@ -1,0 +1,42 @@
+{
+  "skill_name": "creating-linksoft-skills",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Create a reusable Agent Skill for validating JSON schema files in a repository. It should help with schema checks and clear error reporting.",
+      "expected_output": "A narrowly scoped skill plan with a lowercase hyphenated name, an imperative trigger description, sensible structure, and guidance on when to add scripts or evals.",
+      "files": [],
+      "assertions": [
+        "The proposed skill name is lowercase, hyphenated, and specific to one job.",
+        "The proposed description explains both what the skill helps accomplish and when it should be used.",
+        "The response keeps the skill scoped to one coherent capability rather than combining unrelated workflows.",
+        "The response recommends a lean SKILL.md and adds supporting directories only when they materially help.",
+        "The response distinguishes the Agent Skills format from LinkSoft repository-specific requirements."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "My skill description says 'Helps with PDFs.' Rewrite it so it triggers more reliably and suggest how to evaluate the change.",
+      "expected_output": "A stronger description written around user intent, plus trigger-eval guidance with should-trigger and should-not-trigger queries.",
+      "files": [],
+      "assertions": [
+        "The revised description uses imperative phrasing such as 'Use this skill when'.",
+        "The response explains why the original description is too vague.",
+        "The response suggests both positive and negative trigger queries.",
+        "The response recommends an evaluation approach based on multiple realistic queries rather than a single manual check."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "I have a 700-line SKILL.md with API details, long examples, and troubleshooting sections. How should I restructure it?",
+      "expected_output": "A progressive-disclosure recommendation that keeps the core workflow in SKILL.md and moves detailed material into references, scripts, or other supporting files.",
+      "files": [],
+      "assertions": [
+        "The response keeps the core workflow in SKILL.md and moves detailed material into references, scripts, assets, or other supporting files.",
+        "The response recommends using progressive disclosure so extra context is loaded only when needed.",
+        "The response avoids creating deep or nested reference chains.",
+        "The response explains when the agent should read or use the supporting files."
+      ]
+    }
+  ]
+}

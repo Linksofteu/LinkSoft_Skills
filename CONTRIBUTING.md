@@ -61,16 +61,16 @@ Add each new skill under:
 
 Recommended additional files:
 
-- `skills/<skill-name>/README.md`
 - `skills/<skill-name>/scripts/*`
-- `skills/<skill-name>/tests/*`
+- `skills/<skill-name>/references/*`
+- `skills/<skill-name>/evals/evals.json`
+- `skills/<skill-name>/README.md`
 
 `SKILL.md` must include YAML frontmatter with at least:
 
 - `name` (lowercase, hyphenated)
 - `description` (clear trigger/use-case)
-
-Recommended metadata field:
+- `metadata` in this shape:
 
 ```yaml
 metadata:
