@@ -5,7 +5,7 @@ license: MIT
 compatibility: Intended for OpenCode/Codex-style agents on Linux, macOS, or Windows. Requires Bash or PowerShell plus supported IDE CLIs on PATH (`rider`, `webstorm`, `code`, `cursor`, `windsurf` on Unix-like systems; `rider`, `rider.bat`, `rider64.exe`, `webstorm`, `webstorm.bat`, `webstorm64.exe`, `code`, `code.cmd`, `cursor`, `cursor.cmd`, `windsurf`, or `windsurf.cmd` on Windows).
 metadata:
   author: David Orolin
-  version: "1.0.1"
+  version: "1.0.2"
 ---
 
 ## Purpose
@@ -45,6 +45,7 @@ Use this skill when the user wants to open a file or project in a supported IDE 
 3. If no `.idea` exists, fall back to the nearest JavaScript or TypeScript project root containing one of: `package.json`, `pnpm-workspace.yaml`, `yarn.lock`, `package-lock.json`, `bun.lock`, `bun.lockb`, `tsconfig.json`, or `jsconfig.json`.
 4. If no project root is found, open the target directly.
 5. When opening a file at a line, use JetBrains `--line` behavior.
+6. When opening a file without an explicit line number, still pass `--line 1` intentionally as a WebStorm workaround because some WebStorm builds can fail to open the file otherwise.
 6. If WebStorm fails to open a requested file when only project context is provided, retry by anchoring the file open to line `1`.
 
 ### VS Code Family

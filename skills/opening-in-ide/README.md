@@ -20,6 +20,8 @@ The launchers are non-blocking (fire-and-forget) so terminal-based agents can co
 - `scripts/open-in-windsurf.sh`: Linux/macOS Windsurf launcher
 - `scripts/open-in-windsurf.ps1`: Windows PowerShell Windsurf launcher
 - `scripts/lib/*`: shared Bash and PowerShell launcher helpers
+- `evals/evals.json`: agent-facing trigger and behavior evals
+- `evals/run-harness.py`: non-launching eval-quality harness
 - `tests/scenarios.md`: Behavior and edge-case test scenarios
 - `tests/run-harness.py`: Runnable isolated validation harness
 - `tests/README.md`: Test coverage and harness usage notes
@@ -174,6 +176,7 @@ When multiple `.code-workspace`/`.sln`/`.csproj` files exist in a directory:
 2. If no `.idea` exists, search upward for nearest JavaScript or TypeScript project root such as `package.json`, `pnpm-workspace.yaml`, `yarn.lock`, `package-lock.json`, `bun.lock`, `bun.lockb`, `tsconfig.json`, or `jsconfig.json`
 3. If neither exists, open the target directly
 4. When opening a file at a line, use JetBrains `--line`
+5. When opening a file without an explicit line number, still pass `--line 1` intentionally as a WebStorm workaround because some WebStorm builds can fail to open the file otherwise
 5. When opening a file without an explicit line in project context, fall back to line `1` so the file tab opens reliably
 
 ### Cursor and Windsurf
@@ -195,6 +198,14 @@ When multiple `.code-workspace`/`.sln`/`.csproj` files exist in a directory:
 ## Tests
 
 Human-readable scenarios live in `skills/opening-in-ide/tests/scenarios.md`.
+
+Agent-facing eval cases live in `skills/opening-in-ide/evals/evals.json`.
+
+To validate eval quality without launching any IDE commands:
+
+```bash
+python3 skills/opening-in-ide/evals/run-harness.py
+```
 
 To run the isolated script harness:
 

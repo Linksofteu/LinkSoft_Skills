@@ -25,6 +25,7 @@ The harness exercises these script behaviors:
 - data-driven IDE detection for none installed, one installed, and all supported editors installed
 - Rider launch behavior for nearest `.sln`, `.csproj` fallback, and line numbers
 - WebStorm launch behavior for `.idea` and package-root context selection
+- WebStorm's intentional `--line 1` fallback for file opens without an explicit line number
 - VS Code family launch behavior for nearest `.code-workspace`, `.sln` directory fallback, `.csproj` directory fallback, direct open, and `--goto`
 - invalid line handling and invalid path handling
 - representative Bash and PowerShell launch paths for every supported family

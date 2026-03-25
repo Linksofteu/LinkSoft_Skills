@@ -59,8 +59,9 @@
 1. Uses WebStorm launcher
    - **Minimum:** Runs `scripts/open-in-webstorm.sh` (Linux/macOS) or `scripts/open-in-webstorm.ps1` (Windows)
    - **Quality criteria:**
-     - Selects the script matching host OS and shell
-     - Uses nearest `.idea` or JavaScript/TypeScript project-root context when available
+      - Selects the script matching host OS and shell
+      - Uses nearest `.idea` or JavaScript/TypeScript project-root context when available
+      - Passes `--line 1` for file opens without an explicit line number as an intentional WebStorm workaround
 
 ---
 
@@ -93,7 +94,7 @@
    - **Quality criteria:**
       - Checks for `.idea` before other JavaScript or TypeScript markers
       - Includes the requested file when the target is a file
-      - Still opens the file when no explicit line number was requested
+      - Uses `--line 1` when no explicit line number is provided so the file reliably opens in WebStorm
 
 ## Scenario: Open file in nearest solution
 
