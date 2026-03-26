@@ -2,7 +2,7 @@
 name: creating-linksoft-skills
 description: Create or improve Agent Skills that follow the Agent Skills specification and LinkSoft repository conventions. Use this skill when designing a new skill, tightening scope, writing descriptions, structuring references or scripts, adding evals, or reviewing an existing skill for clarity, discoverability, and reuse.
 metadata:
-  author: Softgraphy GK
+  author: David Orolin
   version: "1.2.0"
 ---
 
