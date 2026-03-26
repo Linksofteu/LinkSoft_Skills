@@ -1,0 +1,41 @@
+{
+  "skill_name": "ddd-application-slice",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Help me add an endpoint that returns a paged list of purchase requests in our DDD app. We use a mediator pattern and repositories. Where should the logic go?",
+      "expected_output": "A query-oriented slice design with a thin entrypoint, a query plus handler, direct repository usage in the handler, and mapping to DTOs or read models.",
+      "files": [],
+      "assertions": [
+        "The response classifies the use case as a query/read flow.",
+        "The response keeps the controller, endpoint, or application service thin.",
+        "The response recommends repository plus mapping in the query handler as the default approach.",
+        "The response avoids introducing a domain service unless there is a strong read-specific reason."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I need to implement ApproveOrder. It changes status, validates several business rules, updates related entities, and then sends notifications. We await the approval result in the API.",
+      "expected_output": "A command-oriented design where the primary state change is handled synchronously, business logic is delegated to a domain service, and notifications are treated as follow-up side effects rather than mixed into the entrypoint.",
+      "files": [],
+      "assertions": [
+        "The response classifies the use case as a command/write flow.",
+        "The response routes complex business logic through a domain service rather than leaving it in the controller or handler alone.",
+        "The response separates the primary write from secondary notification side effects.",
+        "The response preserves a thin entrypoint and focused handler."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "After a document is generated, I just want to trigger cache invalidation and an external workflow kickoff, but the user should not wait for those tasks. How should I model that in our mediator-based architecture?",
+      "expected_output": "A fire-and-forget event or equivalent message design that treats the follow-up work as asynchronous reactions outside the immediate response path.",
+      "files": [],
+      "assertions": [
+        "The response recommends an event, notification, or equivalent fire-and-forget message for the follow-up work.",
+        "The response explains that the caller should not be coupled to completion of the secondary tasks.",
+        "The response keeps the primary use case separate from background or reactive side effects.",
+        "The response stays technology-agnostic rather than requiring a specific mediator library."
+      ]
+    }
+  ]
+}

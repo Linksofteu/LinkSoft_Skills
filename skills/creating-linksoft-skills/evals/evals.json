@@ -23,7 +23,8 @@
         "The revised description uses imperative phrasing such as 'Use this skill when'.",
         "The response explains why the original description is too vague.",
         "The response suggests both positive and negative trigger queries.",
-        "The response recommends an evaluation approach based on multiple realistic queries rather than a single manual check."
+        "The response recommends an evaluation approach based on multiple realistic queries rather than a single manual check.",
+        "The response keeps the rewritten description concise instead of turning it into a mini-specification."
       ]
     },
     {
@@ -36,6 +37,17 @@
         "The response recommends using progressive disclosure so extra context is loaded only when needed.",
         "The response avoids creating deep or nested reference chains.",
         "The response explains when the agent should read or use the supporting files."
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Create a new skill for reviewing API changelogs and generating release notes. I have not told you who the author should be.",
+      "expected_output": "A skill-creation response that does not guess the metadata author and instead asks the user who the author should be before finalizing the new skill files.",
+      "files": [],
+      "assertions": [
+        "The response asks who the author should be before finalizing metadata for the new skill.",
+        "The response does not invent or silently copy an author value.",
+        "The response still continues with the rest of the skill-planning guidance as far as possible without blocking on the author field."
       ]
     }
   ]

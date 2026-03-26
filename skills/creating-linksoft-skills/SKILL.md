@@ -3,7 +3,7 @@ name: creating-linksoft-skills
 description: Create or improve Agent Skills that follow the Agent Skills specification and LinkSoft repository conventions. Use this skill when designing a new skill, tightening scope, writing descriptions, structuring references or scripts, adding evals, or reviewing an existing skill for clarity, discoverability, and reuse.
 metadata:
   author: Softgraphy GK
-  version: "1.0.0"
+  version: "1.2.0"
 ---
 
 ## Purpose
@@ -65,7 +65,9 @@ Description guidance:
 - say when it should be used
 - include likely user intents and domain terms
 - stay specific enough to avoid false positives
-- keep it concise and under the 1024-character limit
+- keep it concise and well below the 1024-character limit
+- prefer roughly 1 sentence and usually no more than about 200 characters unless a slightly longer description is clearly necessary for trigger accuracy
+- move procedural detail, caveats, and examples into `SKILL.md` instead of the description
 
 Good example:
 
@@ -74,6 +76,8 @@ description: Use this skill when creating or improving Agent Skills, including n
 ```
 
 Avoid descriptions like `Helps with skills.` or descriptions that only explain implementation details.
+
+Treat description length as a real constraint because descriptions are loaded into context during activation.
 
 If the user asks for description tuning, use the process in `references/descriptions-and-evals.md`.
 
@@ -124,6 +128,12 @@ Treat these as building blocks, not a mandatory checklist. Add only the files an
 - `evals/`: add when the skill benefits from machine-friendly evaluation, usually `evals/evals.json`
 
 Avoid redundant docs like separate installation guides unless they add real value.
+
+When creating a brand new skill, do not guess `metadata.author` if the correct value is unknown.
+
+- If the user already provided the author or it is unambiguous from the conversation, use that value.
+- If the correct author is not known and you need to create `metadata.author`, ask the user who the author should be before finalizing the files.
+- Do not silently copy an author from another skill unless the user clearly wants that.
 
 ### 6. Add references with progressive disclosure
 
@@ -194,6 +204,7 @@ LinkSoft repository requirements:
 
 - the skill lives under `skills/<skill-name>/`
 - `SKILL.md` includes `metadata.author` and `metadata.version`
+- when creating a new skill, ask for `metadata.author` if it is not already known
 - `README.md` is present
 - `metadata.version` is updated for meaningful behavior changes
 - `evals/evals.json` is added or updated when behavior warrants evaluation

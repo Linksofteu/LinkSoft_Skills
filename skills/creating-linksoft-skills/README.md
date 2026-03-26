@@ -35,12 +35,14 @@ Agent Skills format expectations:
 
 - Keep `name` lowercase and hyphenated, matching the folder name
 - Include valid YAML frontmatter with required `name` and `description`
+- Keep `description` concise; prefer a single trigger sentence rather than embedding workflow details there
 - Add optional supporting directories such as `assets/`, `references/`, `scripts/`, and `evals/` only when they add value
 
 LinkSoft repository expectations:
 
 - Store skills under `skills/<skill-name>/`
 - Include `metadata.author` and `metadata.version`
+- Ask the user for `metadata.author` when creating a new skill if the author is not already known
 - Include `README.md` for every skill
 - Add `evals/`, `scripts/`, or `references/` when they add value or repository guidance calls for them
 - Bump `metadata.version` for meaningful behavior changes
