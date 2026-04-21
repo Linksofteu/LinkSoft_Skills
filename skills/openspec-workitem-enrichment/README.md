@@ -40,6 +40,10 @@ For the enrichment flow to work automatically, these things need to be available
 - Azure DevOps MCP authenticated if authentication is required
 - a repository git origin that allows Azure DevOps project inference, or the project name provided by the user
 
+Azure DevOps MCP setup and configuration:
+
+- https://github.com/microsoft/azure-devops-mcp
+
 If Azure DevOps MCP is unavailable or cannot be used, the skill should fail gracefully and ask for the minimum manual details needed to continue.
 
 ## Validation notes
