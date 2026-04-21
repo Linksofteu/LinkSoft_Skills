@@ -1,0 +1,86 @@
+{
+  "skill_name": "openspec-workitem-enrichment",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Create a new OpenSpec spec named wi-12345-add-customer-export and pull everything useful from Azure DevOps so I do not have to type it again.",
+      "expected_output": "The skill triggers, validates the name, extracts work item 12345, infers the Azure DevOps project from git origin when possible, fetches Azure DevOps work item context, and uses that data to enrich the new spec.",
+      "files": [
+        "SKILL.md"
+      ],
+      "assertions": [
+        "The response uses the openspec-workitem-enrichment skill for a new OpenSpec spec request with the required naming pattern.",
+        "The response extracts the numeric work item id from the spec name rather than asking the user to provide it again.",
+        "The response tries to infer the Azure DevOps project name from git origin before asking the user for it.",
+        "The response prefers fetching Azure DevOps work item context before asking follow-up questions.",
+        "The response incorporates traceability back to the Azure DevOps work item."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Please create a spec called add-customer-export for OpenSpec and enrich it from Azure DevOps work item 12345.",
+      "expected_output": "The skill enforces the required naming convention first and asks to rename the spec to the required `wi-<id>-<name>` format before enrichment continues.",
+      "files": [
+        "SKILL.md"
+      ],
+      "assertions": [
+        "The response does not silently accept a spec name that violates the required naming convention.",
+        "The response states the required `wi-<azure-devops-work-item-number>-<name-of-change>` pattern.",
+        "The response helps normalize the name into a lowercase hyphenated slug when needed."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Create a new OpenSpec spec wi-77889-fix-invoice-rounding from Azure DevOps, but only ask me questions if the work item leaves critical gaps.",
+      "expected_output": "The skill infers the Azure DevOps project from git origin when possible, fetches available work item context first, enriches the spec from that data, and limits follow-up questions to unresolved critical gaps.",
+      "files": [
+        "SKILL.md"
+      ],
+      "assertions": [
+        "The response attempts Azure DevOps project-name inference from git origin before asking the user for the project.",
+        "The response avoids asking the user to re-enter work item fields that should be available from Azure DevOps.",
+        "The response distinguishes sourced work item details from inferred content.",
+        "The response captures unresolved gaps explicitly when the work item is sparse."
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Create a new OpenSpec spec named wi-54321-improve-order-audit-log, but Azure DevOps MCP is not installed. Handle that properly.",
+      "expected_output": "The skill checks for Azure DevOps MCP availability, fails gracefully when it is unavailable, explains the blocker, and offers a manual fallback instead of pretending enrichment worked.",
+      "files": [
+        "SKILL.md"
+      ],
+      "assertions": [
+        "The response verifies or accounts for Azure DevOps MCP availability before assuming enrichment can happen.",
+        "The response does not claim that Azure DevOps data was fetched when MCP is unavailable.",
+        "The response explains the failure clearly and offers a manual fallback path.",
+        "The response still preserves the required OpenSpec naming convention behavior."
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Create a new OpenSpec spec named wi-90123-sync-customer-status from Azure DevOps. If you need the project, first try to infer it from the repo git origin instead of asking me.",
+      "expected_output": "The skill first tries to derive the Azure DevOps project from git origin, uses it when the inference is clear, and only asks the user if the origin cannot be used confidently.",
+      "files": [
+        "SKILL.md"
+      ],
+      "assertions": [
+        "The response explicitly prefers deriving the Azure DevOps project name from git origin before asking the user.",
+        "The response treats asking the user for the project name as a fallback rather than the default path.",
+        "The response keeps the rest of the enrichment workflow focused on the OpenSpec spec creation task."
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "Fetch Azure DevOps work item 54321 and summarize it for me.",
+      "expected_output": "The skill should not trigger because the request is not about creating a new OpenSpec spec using the required naming pattern.",
+      "files": [
+        "SKILL.md"
+      ],
+      "assertions": [
+        "The response does not invoke or recommend the openspec-workitem-enrichment skill for a generic Azure DevOps lookup request.",
+        "The response recognizes that this skill is scoped to new OpenSpec spec creation rather than general work item summarization."
+      ]
+    }
+  ]
+}
