@@ -4,7 +4,7 @@
     {
       "id": 1,
       "prompt": "Create a new OpenSpec spec named wi-12345-add-customer-export and pull everything useful from Azure DevOps so I do not have to type it again.",
-      "expected_output": "The skill triggers, validates the name, extracts work item 12345, infers the Azure DevOps project from git origin when possible, fetches Azure DevOps work item context, and uses that data to enrich the new spec.",
+      "expected_output": "The skill triggers, validates the name, extracts work item 12345, infers the Azure DevOps project from git origin when possible, prefers direct work-item-by-id retrieval after OpenAuth authentication, uses batch-by-id retrieval as the default main lookup, fetches Azure DevOps work item context, and uses that data to enrich the new spec.",
       "files": [
         "SKILL.md"
       ],
@@ -12,7 +12,8 @@
         "The response uses the openspec-workitem-enrichment skill for a new OpenSpec spec request with the required naming pattern.",
         "The response extracts the numeric work item id from the spec name rather than asking the user to provide it again.",
         "The response tries to infer the Azure DevOps project name from git origin before asking the user for it.",
-        "The response prefers fetching Azure DevOps work item context before asking follow-up questions.",
+        "The response prefers direct work-item-by-id retrieval after authentication before asking follow-up questions.",
+        "The response uses or prefers azure-devops_wit_get_work_items_batch_by_ids rather than azure-devops_wit_get_work_item for the main lookup.",
         "The response incorporates traceability back to the Azure DevOps work item."
       ]
     },
@@ -32,12 +33,14 @@
     {
       "id": 3,
       "prompt": "Create a new OpenSpec spec wi-77889-fix-invoice-rounding from Azure DevOps, but only ask me questions if the work item leaves critical gaps.",
-      "expected_output": "The skill infers the Azure DevOps project from git origin when possible, fetches available work item context first, enriches the spec from that data, and limits follow-up questions to unresolved critical gaps.",
+      "expected_output": "The skill infers the Azure DevOps project from git origin when possible, uses batch-by-id retrieval first, enriches the spec from that data, and limits follow-up questions to unresolved critical gaps.",
       "files": [
         "SKILL.md"
       ],
       "assertions": [
         "The response attempts Azure DevOps project-name inference from git origin before asking the user for the project.",
+        "The response prefers direct work-item-by-id retrieval rather than deriving details from the spec slug.",
+        "The response avoids azure-devops_wit_get_work_item for the main enrichment lookup.",
         "The response avoids asking the user to re-enter work item fields that should be available from Azure DevOps.",
         "The response distinguishes sourced work item details from inferred content.",
         "The response captures unresolved gaps explicitly when the work item is sparse."
@@ -80,6 +83,47 @@
       "assertions": [
         "The response does not invoke or recommend the openspec-workitem-enrichment skill for a generic Azure DevOps lookup request.",
         "The response recognizes that this skill is scoped to new OpenSpec spec creation rather than general work item summarization."
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "Create a new OpenSpec spec named wi-24680-improve-billing-export. Azure DevOps MCP already logged in through OpenAuth, but the first generic lookup failed.",
+      "expected_output": "The skill treats OpenAuth success as a signal to retry using a direct work-item-by-id path, such as batch-by-id retrieval, comments, and revisions endpoints or equivalent MCP methods, instead of inferring requirements from the spec name.",
+      "files": [
+        "SKILL.md"
+      ],
+      "assertions": [
+        "The response recognizes that successful OpenAuth authentication should allow a direct by-id lookup path.",
+        "The response prefers explicit work item retrieval over heuristic or search-based fallback when the id is already known.",
+        "The response avoids azure-devops_wit_get_work_item for the main enrichment lookup.",
+        "The response does not derive substantive requirements from the spec slug after lookup failure."
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "Create a new OpenSpec spec named wi-59871-some-change. The project name is definitely correct, but azure-devops_wit_get_work_item with asOf and expand=relations timed out and comments timed out too.",
+      "expected_output": "The skill treats the timeout as a retrieval strategy issue, retries with batch-by-id retrieval and focused fields, optionally confirms existence via WIQL, and only fetches comments or linked items after the main work item succeeds.",
+      "files": [
+        "SKILL.md"
+      ],
+      "assertions": [
+        "The response does not assume the project name is wrong just because the MCP request timed out.",
+        "The response prefers a light initial batch-by-id call before comments, revisions, or relations expansion.",
+        "The response forbids or avoids azure-devops_wit_get_work_item for the main enrichment flow.",
+        "The response sequences comments and related item retrieval after a successful main work item fetch."
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "Create a new OpenSpec spec named wi-59871-role-access. We already observed that azure-devops_wit_get_work_item returns null for this valid item, while batch-by-id and revisions work.",
+      "expected_output": "The skill treats azure-devops_wit_get_work_item as forbidden for the main enrichment path, uses azure-devops_wit_get_work_items_batch_by_ids first, and may use WIQL or revisions as supporting fallbacks.",
+      "files": [
+        "SKILL.md"
+      ],
+      "assertions": [
+        "The response explicitly avoids azure-devops_wit_get_work_item for the main enrichment lookup.",
+        "The response prefers azure-devops_wit_get_work_items_batch_by_ids as the primary retrieval tool.",
+        "The response may use WIQL only as a confirmation or fallback rather than the primary content source."
       ]
     }
   ]
