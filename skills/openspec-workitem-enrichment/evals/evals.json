@@ -4,17 +4,18 @@
     {
       "id": 1,
       "prompt": "Create a new OpenSpec spec named wi-12345-add-customer-export and pull everything useful from Azure DevOps so I do not have to type it again.",
-      "expected_output": "The skill triggers, validates the name, extracts work item 12345, infers the Azure DevOps project from git origin when possible, prefers direct work-item-by-id retrieval after OpenAuth authentication, uses batch-by-id retrieval as the default main lookup, fetches Azure DevOps work item context, and uses that data to enrich the new spec.",
+      "expected_output": "The skill triggers, validates the name, extracts work item 12345, infers Azure DevOps org and project from git origin when possible, verifies Azure CLI auth and az boards availability, configures Azure DevOps defaults, uses WIQL plus Azure CLI commands to fetch the target work item, comments, and parent hierarchy, and enriches the new spec from that data.",
       "files": [
         "SKILL.md"
       ],
       "assertions": [
         "The response uses the openspec-workitem-enrichment skill for a new OpenSpec spec request with the required naming pattern.",
         "The response extracts the numeric work item id from the spec name rather than asking the user to provide it again.",
-        "The response tries to infer the Azure DevOps project name from git origin before asking the user for it.",
-        "The response prefers direct work-item-by-id retrieval after authentication before asking follow-up questions.",
-        "The response uses or prefers azure-devops_wit_get_work_items_batch_by_ids rather than azure-devops_wit_get_work_item for the main lookup.",
-        "The response incorporates traceability back to the Azure DevOps work item."
+        "The response tries to infer the Azure DevOps org and project from git origin before asking the user for them.",
+        "The response uses Azure CLI auth and az boards commands rather than Azure DevOps MCP or direct REST calls.",
+        "The response includes WIQL confirmation before or as part of the detailed fetch flow.",
+        "The response incorporates traceability back to the Azure DevOps work item.",
+        "The response includes comments and parent hierarchy when available."
       ]
     },
     {
@@ -33,14 +34,14 @@
     {
       "id": 3,
       "prompt": "Create a new OpenSpec spec wi-77889-fix-invoice-rounding from Azure DevOps, but only ask me questions if the work item leaves critical gaps.",
-      "expected_output": "The skill infers the Azure DevOps project from git origin when possible, uses batch-by-id retrieval first, enriches the spec from that data, and limits follow-up questions to unresolved critical gaps.",
+      "expected_output": "The skill infers Azure DevOps org and project from git origin when possible, uses Azure CLI auth, verifies az boards availability, fetches the work item, comments, and parent chain through Azure CLI, enriches the spec from that data, and limits follow-up questions to unresolved critical gaps.",
       "files": [
         "SKILL.md"
       ],
       "assertions": [
-        "The response attempts Azure DevOps project-name inference from git origin before asking the user for the project.",
-        "The response prefers direct work-item-by-id retrieval rather than deriving details from the spec slug.",
-        "The response avoids azure-devops_wit_get_work_item for the main enrichment lookup.",
+        "The response attempts Azure DevOps org and project inference from git origin before asking the user.",
+        "The response prefers sourced Azure CLI data rather than deriving details from the spec slug.",
+        "The response avoids Azure DevOps MCP and direct REST for the enrichment flow.",
         "The response avoids asking the user to re-enter work item fields that should be available from Azure DevOps.",
         "The response distinguishes sourced work item details from inferred content.",
         "The response captures unresolved gaps explicitly when the work item is sparse."
@@ -48,28 +49,28 @@
     },
     {
       "id": 4,
-      "prompt": "Create a new OpenSpec spec named wi-54321-improve-order-audit-log, but Azure DevOps MCP is not installed. Handle that properly.",
-      "expected_output": "The skill checks for Azure DevOps MCP availability, fails gracefully when it is unavailable, explains the blocker, and offers a manual fallback instead of pretending enrichment worked.",
+      "prompt": "Create a new OpenSpec spec named wi-54321-improve-order-audit-log, but Azure CLI is not logged in yet. Handle that properly.",
+      "expected_output": "The skill checks for Azure CLI auth, explains that `az login` is required, does not pretend enrichment worked, and offers a manual fallback only if Azure CLI-based enrichment cannot proceed.",
       "files": [
         "SKILL.md"
       ],
       "assertions": [
-        "The response verifies or accounts for Azure DevOps MCP availability before assuming enrichment can happen.",
-        "The response does not claim that Azure DevOps data was fetched when MCP is unavailable.",
-        "The response explains the failure clearly and offers a manual fallback path.",
+        "The response verifies or accounts for Azure CLI authentication before assuming enrichment can happen.",
+        "The response instructs the user to run `az login` when auth is missing.",
+        "The response does not claim that Azure DevOps data was fetched when authentication is unavailable.",
         "The response still preserves the required OpenSpec naming convention behavior."
       ]
     },
     {
       "id": 5,
-      "prompt": "Create a new OpenSpec spec named wi-90123-sync-customer-status from Azure DevOps. If you need the project, first try to infer it from the repo git origin instead of asking me.",
-      "expected_output": "The skill first tries to derive the Azure DevOps project from git origin, uses it when the inference is clear, and only asks the user if the origin cannot be used confidently.",
+      "prompt": "Create a new OpenSpec spec named wi-90123-sync-customer-status from Azure DevOps. If you need the org or project, first try to infer them from the repo git origin instead of asking me.",
+      "expected_output": "The skill first tries to derive the Azure DevOps org and project from git origin, uses them when the inference is clear, and only asks the user if the origin cannot be used confidently.",
       "files": [
         "SKILL.md"
       ],
       "assertions": [
-        "The response explicitly prefers deriving the Azure DevOps project name from git origin before asking the user.",
-        "The response treats asking the user for the project name as a fallback rather than the default path.",
+        "The response explicitly prefers deriving the Azure DevOps org and project from git origin before asking the user.",
+        "The response treats asking the user for the org or project as a fallback rather than the default path.",
         "The response keeps the rest of the enrichment workflow focused on the OpenSpec spec creation task."
       ]
     },
@@ -87,43 +88,46 @@
     },
     {
       "id": 7,
-      "prompt": "Create a new OpenSpec spec named wi-24680-improve-billing-export. Azure DevOps MCP already logged in through OpenAuth, but the first generic lookup failed.",
-      "expected_output": "The skill treats OpenAuth success as a signal to retry using a direct work-item-by-id path, such as batch-by-id retrieval, comments, and revisions endpoints or equivalent MCP methods, instead of inferring requirements from the spec name.",
+      "prompt": "Create a new OpenSpec spec named wi-24680-improve-billing-export. Use the scripted Azure CLI plus az boards flow instead of Azure DevOps MCP.",
+      "expected_output": "The skill uses the bundled script flow or its equivalent: infer org/project, verify Azure CLI auth, verify az boards availability, configure defaults, confirm the item via WIQL, fetch detailed work item fields, comments, and the parent chain, and avoid Azure DevOps MCP and raw REST entirely.",
       "files": [
         "SKILL.md"
       ],
       "assertions": [
-        "The response recognizes that successful OpenAuth authentication should allow a direct by-id lookup path.",
-        "The response prefers explicit work item retrieval over heuristic or search-based fallback when the id is already known.",
-        "The response avoids azure-devops_wit_get_work_item for the main enrichment lookup.",
-        "The response does not derive substantive requirements from the spec slug after lookup failure."
+        "The response prefers the bundled shell or PowerShell helper scripts when practical.",
+        "The response uses Azure CLI auth and az boards rather than MCP tools or REST.",
+        "The response includes WIQL in the retrieval flow.",
+        "The response uses az devops invoke for comments if needed.",
+        "The response does not derive substantive requirements from the spec slug after lookup trouble."
       ]
     },
     {
       "id": 8,
-      "prompt": "Create a new OpenSpec spec named wi-59871-some-change. The project name is definitely correct, but azure-devops_wit_get_work_item with asOf and expand=relations timed out and comments timed out too.",
-      "expected_output": "The skill treats the timeout as a retrieval strategy issue, retries with batch-by-id retrieval and focused fields, optionally confirms existence via WIQL, and only fetches comments or linked items after the main work item succeeds.",
+      "prompt": "Create a new OpenSpec spec named wi-24680-improve-billing-export, but first detect whether I can use az and whether az boards is available. If az boards is missing, tell me exactly what to install.",
+      "expected_output": "The skill checks for Azure CLI first, then checks whether the Azure DevOps extension is available through az boards, and instructs the user to run `az extension add --name azure-devops` if needed before attempting enrichment.",
       "files": [
         "SKILL.md"
       ],
       "assertions": [
-        "The response does not assume the project name is wrong just because the MCP request timed out.",
-        "The response prefers a light initial batch-by-id call before comments, revisions, or relations expansion.",
-        "The response forbids or avoids azure-devops_wit_get_work_item for the main enrichment flow.",
-        "The response sequences comments and related item retrieval after a successful main work item fetch."
+        "The response checks for Azure CLI before relying on Azure DevOps commands.",
+        "The response checks for az boards availability before enrichment.",
+        "The response tells the user to install the azure-devops extension if az boards is unavailable.",
+        "The response does not fall back to REST or MCP."
       ]
     },
     {
       "id": 9,
-      "prompt": "Create a new OpenSpec spec named wi-59871-role-access. We already observed that azure-devops_wit_get_work_item returns null for this valid item, while batch-by-id and revisions work.",
-      "expected_output": "The skill treats azure-devops_wit_get_work_item as forbidden for the main enrichment path, uses azure-devops_wit_get_work_items_batch_by_ids first, and may use WIQL or revisions as supporting fallbacks.",
+      "prompt": "Create a new OpenSpec spec named wi-59873-add-intest-status-to-echoes and include all parent work items plus comments in a structured top-down output.",
+      "expected_output": "The skill fetches the requested work item, follows parent hierarchy to the topmost parent, fetches comments for each item in the chain, and produces structured output from topmost parent down to the requested work item, including only subsection blocks that actually have content.",
       "files": [
         "SKILL.md"
       ],
       "assertions": [
-        "The response explicitly avoids azure-devops_wit_get_work_item for the main enrichment lookup.",
-        "The response prefers azure-devops_wit_get_work_items_batch_by_ids as the primary retrieval tool.",
-        "The response may use WIQL only as a confirmation or fallback rather than the primary content source."
+        "The response follows parent hierarchy rather than returning only the requested work item.",
+        "The response includes comments for each fetched work item when available.",
+        "The response emits a top-down structure beginning with the highest available parent.",
+        "The response includes Description, Acceptance Criteria, and Comments sections only when those sections have content.",
+        "The response keeps the work item heading even when a level has no populated subsections."
       ]
     }
   ]

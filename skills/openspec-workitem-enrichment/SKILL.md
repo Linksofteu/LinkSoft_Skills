@@ -1,248 +1,250 @@
 ---
 name: openspec-workitem-enrichment
-description: Use this skill when creating a new OpenSpec spec whose name follows `wi-<azure-devops-work-item-id>-<change-name>` so the spec can be enriched automatically from the Azure DevOps work item instead of asking the developer to re-enter that context.
+description: Use this skill when creating a new OpenSpec spec whose name follows `wi-<azure-devops-work-item-id>-<change-name>` so the spec can be enriched from Azure DevOps through Azure CLI, including parent hierarchy and comments, instead of manual re-entry.
 metadata:
   author: David Orolin
-  version: "1.0.5"
+  version: "4.0.2"
 ---
 
 ## Purpose
 
-Use this skill when a new OpenSpec spec should be created from an Azure DevOps work item and the spec name follows the required pattern `wi-<work-item-id>-<change-name>`.
+Use this skill when creating a new OpenSpec spec from an Azure DevOps work item and the spec name follows `wi-<work-item-id>-<change-name>`.
+
+This skill no longer depends on Azure DevOps MCP or direct REST calls. It uses Azure CLI with the Azure DevOps extension.
 
 ## In scope
 
-- creating a new OpenSpec spec with the required name pattern
+- creating a new OpenSpec spec with the required naming pattern
 - extracting the Azure DevOps work item id from the spec name
-- fetching available work item context through Azure DevOps MCP
-- preferring explicit work-item-by-id retrieval after OpenAuth authentication succeeds
-- enriching the spec so the developer does not need to retype existing work item information
+- inferring Azure DevOps org and project from the local git remote when possible
+- verifying Azure CLI and the Azure DevOps CLI extension are available
+- using `az boards` commands, `az devops invoke`, and WIQL to fetch work item context
+- walking up the parent hierarchy from the target work item to the topmost parent
+- producing structured output from topmost parent down to the requested work item
+- enriching the new spec from sourced work item data
 
 ## Out of scope
 
-- general Azure DevOps issue triage unrelated to spec creation
+- general Azure DevOps triage unrelated to new spec creation
 - editing an existing spec that does not map to a work item
-- inventing missing requirements that are not supported by the work item or user input
+- inventing missing requirements not supported by the work item or user input
 
 ## Required naming rule
 
-New OpenSpec specs handled by this skill must use this pattern:
+The spec name must match:
 
 `wi-<azure-devops-work-item-number>-<name-of-change>`
 
-Examples:
+Recommended validation pattern:
 
-- `wi-12345-add-customer-export`
-- `wi-9876-fix-invoice-rounding`
+`^wi-(\d+)-([a-z0-9]+(?:-[a-z0-9]+)*)$`
 
-If the name does not match this pattern:
+If the name does not match:
 
-1. do not continue with enrichment yet
-2. tell the user the required format
-3. help normalize the change name into a lowercase hyphenated slug if needed
+1. stop enrichment
+2. explain the required format
+3. help normalize the change name into a lowercase hyphenated slug
 
-Use this validation rule:
+## Default workflow
 
-- work item id must be numeric
-- change name should be lowercase and hyphenated
-- recommended match pattern: `^wi-(\d+)-([a-z0-9]+(?:-[a-z0-9]+)*)$`
+1. Confirm the task is to create a new OpenSpec spec.
+2. Validate the spec name and extract the numeric work item id.
+3. Infer Azure DevOps org and project from git origin before asking the user.
+4. If inference is unclear, ask only for the missing org or project.
+5. Verify Azure CLI is installed and authenticated. If needed, tell the user to run `az login`.
+6. Verify `az boards` is available. If not, tell the user to install the Azure DevOps extension with `az extension add --name azure-devops`.
+7. Configure Azure DevOps defaults from the inferred org and project:
 
-## Workflow
+   ```bash
+   az devops configure --defaults organization="https://dev.azure.com/ORG" project="PROJECT"
+   ```
 
-1. Confirm the task is about creating a new OpenSpec spec.
-2. Extract the Azure DevOps work item id from the spec name.
-3. Infer the Azure DevOps project name from the local git remote origin before asking the user.
-4. Verify Azure DevOps MCP is available and usable before relying on enrichment.
-5. After OpenAuth authentication succeeds, prefer direct work-item-by-id retrieval over any generic or heuristic lookup.
-6. Fetch all reasonably available work item information using the approved Azure DevOps MCP retrieval sequence.
-7. If the first lookup attempt fails, retry using the approved fallback sequence before asking the user for manual details.
-8. Prefer first-party work item data over asking the developer to repeat it.
-9. Never derive substantive work item content from the spec name beyond the numeric id and slug.
-10. Use the fetched data to prefill the spec with sourced content first, then clearly marked inferences only when helpful.
-11. Ask follow-up questions only for critical gaps that cannot be resolved from the work item.
+8. Use `az boards query --wiql ...` to confirm the work item exists in the target project.
+9. Fetch detailed work item fields with `az boards work-item show --id <id>`.
+10. Fetch comments with `az devops invoke` against the work item comments endpoint.
+11. Fetch parent relations and walk up the hierarchy until the topmost parent is reached.
+12. Build structured output from the topmost parent down to the requested work item.
+13. Enrich the spec from sourced data first, and clearly label any inferences.
+14. Ask follow-up questions only for critical gaps that cannot be resolved from the work item chain.
 
-## Azure DevOps project detection
+## Scripted helpers
 
-Before asking the user for an Azure DevOps project name, first inspect the repository git remote origin.
+Prefer the bundled scripts instead of rebuilding the flow ad hoc:
 
-Default behavior:
+- Bash context inference: `scripts/infer-azure-devops-context.sh`
+- Bash work item fetch: `scripts/fetch-work-item-context.sh`
+- PowerShell context inference: `scripts/infer-azure-devops-context.ps1`
+- PowerShell work item fetch: `scripts/fetch-work-item-context.ps1`
 
-1. read the `origin` remote URL or path
-2. extract the Azure DevOps project name from that origin
-3. use the inferred project name for Azure DevOps MCP calls when the match is clear
-4. only ask the user for the project name if the origin is missing, unreadable, or does not allow a confident project-name extraction
+Use the Bash scripts in Unix-like environments and the PowerShell scripts in PowerShell environments.
 
-Assume the git origin normally contains the project name.
+## Project and org inference
 
-Examples of acceptable sources:
+Before asking the user for Azure DevOps details, inspect `origin`.
 
-- Azure DevOps HTTPS remotes such as `https://dev.azure.com/org/ProjectName/_git/RepoName`
-- Azure DevOps SSH remotes or equivalent origin paths where the project segment is still present
+Accepted remote shapes include:
 
-If inference fails, ask one focused follow-up question for the Azure DevOps project name instead of asking the user to restate other details already available.
+- `https://dev.azure.com/org/ProjectName/_git/RepoName`
+- `git@ssh.dev.azure.com:v3/org/ProjectName/RepoName`
+- `https://org.visualstudio.com/ProjectName/_git/RepoName`
 
-## Azure DevOps MCP preflight
+Use the bundled inference script first. Only ask the user when the remote is missing or ambiguous.
 
-Before enrichment, verify that Azure DevOps MCP is:
+## Required prerequisite checks
 
-- installed or otherwise available to the agent runtime
-- reachable and functioning
-- authenticated if authentication is required
-- supplied with the inferred project name when one was confidently derived from git origin
+Use Azure CLI plus the Azure DevOps extension, not Azure DevOps MCP and not direct REST calls.
 
-If Azure DevOps MCP is available, continue with work item lookup.
+Expected check order:
 
-Because Azure DevOps MCP uses OpenAuth, treat a successful login as permission to use the most direct work item endpoints or MCP methods available. Do not fall back to deriving requirements from the spec name just because a broader lookup path failed.
+1. verify `az` is installed
+2. verify the user is logged in with `az login`
+3. verify the Azure DevOps extension is available by checking `az boards`
+4. if the extension is missing, tell the user to run:
 
-Treat MCP timeout errors as a retrieval-strategy problem first, not as proof that the project name or work item id is wrong.
+   ```bash
+   az extension add --name azure-devops
+   ```
 
-Live validation in this environment showed that `azure-devops_wit_get_work_item` can return `null` for a valid project and work item while other Azure DevOps calls succeed. Treat that tool as unreliable for this skill's enrichment path.
+5. after org/project inference, configure defaults with `az devops configure --defaults ...`
 
-If Azure DevOps MCP is not available or not usable:
+If login is needed, explicitly tell the user to run:
 
-1. fail gracefully instead of pretending enrichment succeeded
-2. tell the user that Azure DevOps MCP could not be used
-3. state the likely reason when known, such as not installed, not configured, not authenticated, or inaccessible
-4. offer a manual fallback so the user can still continue creating the spec
+```bash
+az login
+```
 
-Recommended fallback message shape:
+If the Azure DevOps extension is also missing, explicitly tell the user to run:
 
-- explain that automatic enrichment could not be completed
-- say whether the blocker is availability, configuration, or authentication
-- ask for the minimum manual details needed to continue
+```bash
+az extension add --name azure-devops
+```
 
-Recommended minimum manual fallback details:
+If both are needed, present both commands in the order they should run:
 
-- work item title
-- description or business context
-- acceptance criteria
-- related dependencies or linked items if known
+```bash
+az login
+az extension add --name azure-devops
+```
 
-## Preferred retrieval path after OpenAuth
+If Azure CLI is missing, not authenticated, or `az boards` is unavailable:
 
-When the work item id is already known from the spec name, use a direct by-id retrieval path.
+- do not pretend enrichment succeeded
+- explain the blocker clearly
+- print the exact command the user needs to run, such as `az login` and/or `az extension add --name azure-devops`, plus provide missing org/project details if inference failed
+- offer manual fallback only if Azure CLI-based enrichment cannot proceed
 
-Preferred order in this environment:
+## Required retrieval order
 
-1. `azure-devops_wit_get_work_items_batch_by_ids`
-   - use the numeric id from the spec name
-   - use the inferred project when available
-   - request a focused field set first
-   - this is the default primary retrieval tool for the skill
-2. `azure-devops_wit_list_work_item_comments`
-   - call this only after the main work item call succeeds
-   - use this when comments may contain clarifications or acceptance details not present on the main work item body
-   - keep the initial `top` small, such as 5 to 10
-3. `azure-devops_wit_list_work_item_revisions`
-   - use this when the work item is sparse, recently edited, or likely missing useful history
-   - keep the initial `top` small
-4. `azure-devops_wit_get_work_items_batch_by_ids`
-   - use this only for linked items that materially clarify scope
-5. `azure-devops_wit_query_by_wiql`
-   - use this as a fallback to confirm that the work item exists in the stated project when direct retrieval is behaving inconsistently
-   - use it to support targeted retries, not as the primary source of detailed content
+When the work item id is already known from the spec name, use this order:
 
-## Forbidden retrieval path
+1. infer org/project from git origin
+2. verify `az boards` is available
+3. configure Azure DevOps defaults from the inferred org and project
+4. WIQL existence check for the known work item id
+5. detailed work item fetch with focused fields
+6. fetch comments for the target item
+7. fetch parent relations for the target item
+8. repeat the work item, comments, and parent-relation fetch for each parent until the topmost parent is reached
+9. emit structured top-down output
 
-For this skill, do not use `azure-devops_wit_get_work_item` for the main enrichment lookup.
+Keep the first fetch light. Do not start with the heaviest possible request shape.
 
-Reason:
+## Preferred Azure CLI commands
 
-- live testing in this environment showed `azure-devops_wit_get_work_item` returning `null` for a valid work item in the correct project while batch, WIQL, comments, and revisions calls succeeded
+Preferred commands for this skill:
 
-This is a hard rule for this skill unless the repository maintainers explicitly revise it after future validation.
+- `az devops configure --defaults organization="..." project="..."`
+- `az boards query --wiql "..."`
+- `az boards work-item show --id <id> --fields ...`
+- `az boards work-item relation show --id <id>`
+- `az devops invoke --area wit --resource comments ...`
 
-If an OpenAuth-backed REST path is exposed instead of the higher-level MCP methods, aim the agent at the corresponding Azure DevOps WIT endpoints:
+The bundled fetch scripts use WIQL first, then fetch the target work item, its comments, its parent chain, and comments for each parent.
 
-- `/_apis/wit/workitems/{id}`
-- `/_apis/wit/workItems/{id}/comments`
-- `/_apis/wit/workItems/{id}/revisions`
+## What to fetch
 
-Prefer direct work-item-by-id retrieval over search-based discovery when the id is already known.
+Fetch as much relevant work item context as is practical, including when available:
 
-## Timeout mitigation
+- id, title, type, state, reason
+- description, acceptance criteria, repro steps
+- assigned to, created by, changed date
+- area path, iteration path, tags, priority, value area, business value
+- comments that clarify scope, decisions, or follow-up detail
+- relation data needed to walk to the topmost parent
 
-If a direct Azure DevOps lookup times out:
+For hierarchy enrichment, fetch these items in the same way for every parent in the chain up to the topmost parent.
 
-1. Keep the same project and work item id unless there is specific evidence they are wrong.
-2. Retry with `azure-devops_wit_get_work_items_batch_by_ids` and a focused `fields` list if that has not already been attempted.
-3. If the batch call still behaves inconsistently, use `azure-devops_wit_query_by_wiql` to confirm the item exists in the project.
-4. Only after the main work item succeeds, fetch comments and revisions as separate follow-up calls.
-5. If relationship context is still needed, fetch linked items separately instead of switching to the forbidden tool.
-6. Tell the user it was a timeout and what narrower retry path was attempted.
-
-Recommended light-first pattern:
-
-1. `azure-devops_wit_get_work_items_batch_by_ids` with id, project, and focused fields only
-2. `azure-devops_wit_list_work_item_comments` with a small `top`
-3. `azure-devops_wit_list_work_item_revisions` only if needed
-4. `azure-devops_wit_query_by_wiql` if existence confirmation is needed
-5. linked-item retrieval only if needed
-
-## What to fetch from Azure DevOps MCP
-
-Fetch as much relevant context as the MCP exposes for the work item, including when available:
-
-- id, title, type, state, reason, priority, severity, value area
-- description, acceptance criteria, repro steps, business context
-- assigned to, created by, iteration path, area path, tags
-- parent, child, related, blocked-by, and other linked work items
-- comments, discussion, history, or recent updates
-- URLs or identifiers that help trace the work item back to Azure DevOps
-
-If linked work items materially clarify scope, include the important details in the spec summary instead of copying everything verbatim.
-
-If the direct work item lookup succeeds only partially, use the retrieved fields and clearly note what could not be fetched. Do not replace missing fields with guessed content from the spec slug.
+If the data is sparse, create a minimal spec shell and list unresolved gaps explicitly.
 
 ## Enrichment behavior
 
 When drafting the spec:
 
-1. Use the work item title as the default starting point for the spec title or summary.
-2. Use the description and acceptance criteria to populate the problem statement, goals, requirements, or success criteria.
-3. Use tags, type, priority, links, and hierarchy to capture implementation context, dependencies, and affected areas.
-4. Preserve traceability by including the Azure DevOps work item id and link in the spec.
-5. Distinguish sourced facts from inferred guidance.
+1. build a top-down hierarchy from the topmost parent to the requested work item
+2. for each item in the chain, include its type, title, description, acceptance criteria when present, and comments
+3. use the requested work item title as the default summary anchor for the most specific implementation slice
+4. use description and acceptance criteria across the hierarchy to populate the problem statement, requirements, and success criteria
+5. use tags, priority, and paths to capture context and constraints
+6. preserve traceability with the Azure DevOps work item ids and URLs
+7. distinguish sourced facts from inferred guidance
 
 Defaults:
 
-- prefer concise synthesis over dumping raw fields
-- quote or preserve exact wording for acceptance criteria when they already read like requirements
-- mark inferred sections with labels such as `Inferred from work item` when not directly stated
-- if the work item is sparse, create a minimal spec shell and list the unresolved gaps clearly
+- prefer concise synthesis over raw field dumps
+- preserve acceptance criteria wording when it already reads like requirements
+- mark inferred sections clearly
+- do not replace missing fields with guessed content from the slug
+
+Preferred structured output shape:
+
+```markdown
+## <Topmost parent type>: <Topmost parent title> (#<id>)
+<Only include subsection blocks that have content>
+
+### Description
+<description>
+
+### Acceptance Criteria
+<acceptance criteria>
+
+### Comments
+<comment bullets>
+
+## <Next child type>: <Next child title> (#<id>)
+...
+```
+
+If a section has no content, omit that subsection entirely. Keep the work item heading even when an item has no populated subsections.
 
 ## Guardrails
 
-- Do not fabricate requirements, user journeys, or technical decisions that are absent from the work item and user request.
-- Do not hide uncertainty; call out ambiguity explicitly.
-- Do not ignore naming violations.
-- Do not ask for the Azure DevOps project name before trying to derive it from git origin.
-- Do not ask the user to re-enter work item fields that were already retrieved successfully.
-- Do not act as though Azure DevOps enrichment succeeded when MCP is unavailable or failing.
-- Do not treat the spec slug as a substitute for the work item title, description, or acceptance criteria.
-- Do not skip direct work-item-by-id retrieval when OpenAuth authentication has already succeeded.
-- Do not assume a timeout means the project name is wrong when the project is already known to be correct.
-- Do not start with the heaviest possible combination of `asOf`, `expand: relations`, comments, and revisions unless the user specifically needs that breadth immediately.
-- Do not use `azure-devops_wit_get_work_item` for the main enrichment flow in this skill.
+- Do not use Azure DevOps MCP for this skill.
+- Do not use direct REST calls for this skill.
+- Do not ask for the Azure DevOps org or project before trying git-origin inference.
+- Do not derive substantive requirements from the spec slug.
+- Do not claim Azure DevOps data was fetched if Azure CLI auth or `az boards` checks failed.
+- Do not ask the user to re-enter fields that were already retrieved successfully.
+- Do not skip the WIQL confirmation step when following the scripted flow.
+- Do not skip comments when they are available.
+- Do not stop at the requested work item if parent hierarchy is available.
+- Do not jump to relation retrieval before the main work item fetch succeeds.
 
-## Suggested spec content
+## Manual fallback
 
-When the target OpenSpec format is not otherwise prescribed, prefer including:
+If Azure CLI-based enrichment cannot be completed, ask for only the minimum details needed to continue:
 
-- spec identifier or name
-- linked Azure DevOps work item
-- summary or problem statement
-- goals or intended outcome
-- requirements or acceptance criteria
-- dependencies, related items, or constraints
-- open questions or missing information
+- work item title
+- description or business context
+- acceptance criteria
+- dependencies or related items if known
 
 ## Final check
 
 Before finishing:
 
 1. verify the spec name still matches the required pattern
-2. verify the Azure DevOps work item id used for enrichment matches the name
-3. verify Azure DevOps MCP was available, or that graceful fallback behavior was used
-4. verify fetched work item context was incorporated where relevant
-5. verify any inferred content is clearly marked
+2. verify the work item id used for enrichment matches the name
+3. verify the org and project came from git origin or a focused user answer
+4. verify Azure CLI plus `az boards` and `az devops invoke` retrieval succeeded, or that graceful fallback was used
+5. verify the parent chain was followed to the topmost available parent
+6. verify sourced vs inferred content is clearly separated
