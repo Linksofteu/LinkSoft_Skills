@@ -3,6 +3,26 @@ Public repository for AI agentic skills.
 
 See `CONTRIBUTING.md` for contribution guidelines.
 
+## Installation
+
+List all available skills:
+
+```sh
+npx skills add Linksofteu/LinkSoft_Skills --list
+```
+
+Install a specific skill:
+
+```sh
+npx skills add Linksofteu/LinkSoft_Skills@<skill-name>
+```
+
+For example:
+
+```sh
+npx skills add Linksofteu/LinkSoft_Skills@creating-linksoft-skills
+```
+
 ## Adding a New Skill
 
 1. Create a new folder under `skills/`:
