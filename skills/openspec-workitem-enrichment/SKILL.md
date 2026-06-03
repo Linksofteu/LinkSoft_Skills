@@ -1,24 +1,24 @@
 ---
 name: openspec-workitem-enrichment
-description: Use this skill when creating a new OpenSpec spec whose name follows `wi-<azure-devops-work-item-id>-<change-name>` so the spec can be enriched from Azure DevOps through Azure CLI, including parent hierarchy and comments, instead of manual re-entry.
+description: Use this skill when creating a new OpenSpec spec whose name follows `wi-<azure-devops-work-item-id>-<change-name>` so the spec can be enriched from Azure DevOps work item REST API data, including parent hierarchy and comments, instead of manual re-entry.
 metadata:
   author: David Orolin
-  version: "4.0.2"
+  version: "4.1.0"
 ---
 
 ## Purpose
 
 Use this skill when creating a new OpenSpec spec from an Azure DevOps work item and the spec name follows `wi-<work-item-id>-<change-name>`.
 
-This skill no longer depends on Azure DevOps MCP or direct REST calls. It uses Azure CLI with the Azure DevOps extension.
+This skill does not use Azure DevOps MCP or the Azure CLI for work item retrieval. It uses the Azure DevOps REST API directly with a local PAT file.
 
 ## In scope
 
 - creating a new OpenSpec spec with the required naming pattern
 - extracting the Azure DevOps work item id from the spec name
 - inferring Azure DevOps org and project from the local git remote when possible
-- verifying Azure CLI and the Azure DevOps CLI extension are available
-- using `az boards` commands, `az devops invoke`, and WIQL to fetch work item context
+- verifying the required local PAT file is present and correctly shaped
+- using Azure DevOps REST API endpoints to fetch work item context
 - walking up the parent hierarchy from the target work item to the topmost parent
 - producing structured output from topmost parent down to the requested work item
 - enriching the new spec from sourced work item data
@@ -51,21 +51,13 @@ If the name does not match:
 2. Validate the spec name and extract the numeric work item id.
 3. Infer Azure DevOps org and project from git origin before asking the user.
 4. If inference is unclear, ask only for the missing org or project.
-5. Verify Azure CLI is installed and authenticated. If needed, tell the user to run `az login`.
-6. Verify `az boards` is available. If not, tell the user to install the Azure DevOps extension with `az extension add --name azure-devops`.
-7. Configure Azure DevOps defaults from the inferred org and project:
-
-   ```bash
-   az devops configure --defaults organization="https://dev.azure.com/ORG" project="PROJECT"
-   ```
-
-8. Use `az boards query --wiql ...` to confirm the work item exists in the target project.
-9. Fetch detailed work item fields with `az boards work-item show --id <id>`.
-10. Fetch comments with `az devops invoke` against the work item comments endpoint.
-11. Fetch parent relations and walk up the hierarchy until the topmost parent is reached.
-12. Build structured output from the topmost parent down to the requested work item.
-13. Enrich the spec from sourced data first, and clearly label any inferences.
-14. Ask follow-up questions only for critical gaps that cannot be resolved from the work item chain.
+5. Verify the local PAT file exists and contains only `AZURE_DEVOPS_PAT=<token>`.
+6. Fetch the target work item with `GET /_apis/wit/workitems/{id}?$expand=relations&api-version=7.1`.
+7. Fetch comments with `GET /_apis/wit/workItems/{id}/comments?api-version=7.1-preview.4`.
+8. Read parent relations from the expanded work item relations and walk up the hierarchy until the topmost parent is reached.
+9. Build structured output from the topmost parent down to the requested work item.
+10. Enrich the spec from sourced data first, and clearly label any inferences.
+11. Ask follow-up questions only for critical gaps that cannot be resolved from the work item chain.
 
 ## Scripted helpers
 
@@ -90,76 +82,66 @@ Accepted remote shapes include:
 
 Use the bundled inference script first. Only ask the user when the remote is missing or ambiguous.
 
-## Required prerequisite checks
+## Required PAT configuration
 
-Use Azure CLI plus the Azure DevOps extension, not Azure DevOps MCP and not direct REST calls.
+The work item fetch scripts require a local PAT file and do not fall back to Azure CLI authentication.
 
-Expected check order:
+Unix-like environments must use this exact path:
 
-1. verify `az` is installed
-2. verify the user is logged in with `az login`
-3. verify the Azure DevOps extension is available by checking `az boards`
-4. if the extension is missing, tell the user to run:
+`~/.config/linksoft-skills/azure-devops.env`
 
-   ```bash
-   az extension add --name azure-devops
-   ```
+Windows PowerShell must use this exact path:
 
-5. after org/project inference, configure defaults with `az devops configure --defaults ...`
+`%USERPROFILE%\.config\linksoft-skills\azure-devops.env`
 
-If login is needed, explicitly tell the user to run:
+When giving Windows setup instructions, expand `%USERPROFILE%` to the user's actual profile directory if known from the environment. Prefer manual, file-explorer-friendly instructions first:
 
-```bash
-az login
+1. create the directory `<expanded-user-profile>\.config\linksoft-skills`
+2. inside it, create a file named exactly `azure-devops.env`
+3. put exactly one line in the file: `AZURE_DEVOPS_PAT=<your Azure DevOps PAT>`
+4. replace `<your Azure DevOps PAT>` with the actual token and save the file
+
+PowerShell commands may be shown after the manual instructions as an optional shortcut, but they must not be the only Windows guidance.
+
+The file must contain exactly one environment variable assignment, on one line:
+
+```text
+AZURE_DEVOPS_PAT=<your Azure DevOps PAT>
 ```
 
-If the Azure DevOps extension is also missing, explicitly tell the user to run:
+Do not add quotes around the token. Do not commit this file to git.
 
-```bash
-az extension add --name azure-devops
-```
+When creating the PAT in Azure DevOps, tell the user to grant the minimum required scope:
 
-If both are needed, present both commands in the order they should run:
+`Work Items: Read`
 
-```bash
-az login
-az extension add --name azure-devops
-```
+This corresponds to the Azure DevOps REST API `vso.work` permission, which allows reading work items, comments, queries, boards, area paths, and iteration paths. The token does not need write permissions, Code permissions, Build permissions, Packaging permissions, or full access for this skill.
 
-If Azure CLI is missing, not authenticated, or `az boards` is unavailable:
-
-- do not pretend enrichment succeeded
-- explain the blocker clearly
-- print the exact command the user needs to run, such as `az login` and/or `az extension add --name azure-devops`, plus provide missing org/project details if inference failed
-- offer manual fallback only if Azure CLI-based enrichment cannot proceed
+If the PAT file is missing or invalid, stop enrichment and emit precise setup instructions that name the exact path for the current OS and show the exact one-line file shape above.
 
 ## Required retrieval order
 
 When the work item id is already known from the spec name, use this order:
 
 1. infer org/project from git origin
-2. verify `az boards` is available
-3. configure Azure DevOps defaults from the inferred org and project
-4. WIQL existence check for the known work item id
-5. detailed work item fetch with focused fields
-6. fetch comments for the target item
-7. fetch parent relations for the target item
-8. repeat the work item, comments, and parent-relation fetch for each parent until the topmost parent is reached
-9. emit structured top-down output
+2. verify the local PAT file exists and is correctly shaped
+3. detailed work item fetch with `$expand=relations`
+4. fetch comments for the target item
+5. extract the parent id from `System.LinkTypes.Hierarchy-Reverse` relations
+6. repeat the work item and comments fetch for each parent until the topmost parent is reached
+7. emit structured top-down output
 
 Keep the first fetch light. Do not start with the heaviest possible request shape.
 
-## Preferred Azure CLI commands
+## Preferred REST API endpoints
 
-Preferred commands for this skill:
+Preferred documented Azure DevOps REST API endpoints for this skill:
 
-- `az devops configure --defaults organization="..." project="..."`
-- `az boards query --wiql "..."`
-- `az boards work-item show --id <id> --fields ...`
-- `az boards work-item relation show --id <id>`
-- `az devops invoke --area wit --resource comments ...`
+- Work Items - Get Work Item: `GET https://dev.azure.com/{organization}/{project}/_apis/wit/workitems/{id}?$expand=relations&api-version=7.1`
+- Comments - Get Comments: `GET https://dev.azure.com/{organization}/{project}/_apis/wit/workItems/{workItemId}/comments?api-version=7.1-preview.4`
+- PAT authentication: send the PAT as HTTP Basic auth with an empty username and the PAT as the password.
 
-The bundled fetch scripts use WIQL first, then fetch the target work item, its comments, its parent chain, and comments for each parent.
+The bundled fetch scripts fetch the target work item, its comments, its parent chain, and comments for each parent. Do not combine the `fields` query parameter with `$expand=relations`; Azure DevOps rejects that combination. A separate WIQL existence check is intentionally not required because the direct work item GET gives a simpler and more reliable success/failure signal than the previous Azure CLI flow.
 
 ## What to fetch
 
@@ -219,19 +201,18 @@ If a section has no content, omit that subsection entirely. Keep the work item h
 ## Guardrails
 
 - Do not use Azure DevOps MCP for this skill.
-- Do not use direct REST calls for this skill.
+- Do not use Azure CLI work item retrieval for this skill.
 - Do not ask for the Azure DevOps org or project before trying git-origin inference.
 - Do not derive substantive requirements from the spec slug.
-- Do not claim Azure DevOps data was fetched if Azure CLI auth or `az boards` checks failed.
+- Do not claim Azure DevOps data was fetched if the REST API requests failed.
 - Do not ask the user to re-enter fields that were already retrieved successfully.
-- Do not skip the WIQL confirmation step when following the scripted flow.
 - Do not skip comments when they are available.
 - Do not stop at the requested work item if parent hierarchy is available.
 - Do not jump to relation retrieval before the main work item fetch succeeds.
 
 ## Manual fallback
 
-If Azure CLI-based enrichment cannot be completed, ask for only the minimum details needed to continue:
+If REST API-based enrichment cannot be completed, ask for only the minimum details needed to continue:
 
 - work item title
 - description or business context
@@ -245,6 +226,6 @@ Before finishing:
 1. verify the spec name still matches the required pattern
 2. verify the work item id used for enrichment matches the name
 3. verify the org and project came from git origin or a focused user answer
-4. verify Azure CLI plus `az boards` and `az devops invoke` retrieval succeeded, or that graceful fallback was used
+4. verify REST API retrieval succeeded, or that graceful fallback was used
 5. verify the parent chain was followed to the topmost available parent
 6. verify sourced vs inferred content is clearly separated

@@ -10,36 +10,118 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
-    throw "Azure CLI is required."
+function Get-PatFileErrorMessage {
+    param([string]$PatFile)
+
+    $userProfile = Get-UserProfilePath
+    $patDir = Join-Path $userProfile '.config\linksoft-skills'
+
+    return @"
+Azure DevOps PAT configuration file was not found or is invalid.
+
+Your user profile resolves to:
+  $userProfile
+
+Create this exact directory:
+  $patDir
+
+Inside that directory, create this exact file:
+  azure-devops.env
+
+The full file path must be:
+  $PatFile
+
+The file must contain exactly one line:
+  AZURE_DEVOPS_PAT=<your Azure DevOps PAT>
+
+Do not add quotes around the token. Do not add extra lines. Do not commit this file to git.
+
+When creating the PAT in Azure DevOps, grant the minimum required scope:
+  Work Items: Read
+
+This corresponds to the Azure DevOps REST API vso.work permission, which allows reading work items, comments, queries, boards, area paths, and iteration paths. The token does not need write permissions, Code permissions, Build permissions, Packaging permissions, or full access for this skill.
+
+Optional PowerShell commands to create it:
+  New-Item -ItemType Directory -Force "$patDir"
+  Set-Content -NoNewline -Path "$PatFile" -Value "AZURE_DEVOPS_PAT=<your Azure DevOps PAT>"
+
+Replace <your Azure DevOps PAT> with the actual token before saving the file or running the command.
+
+Example file contents:
+  AZURE_DEVOPS_PAT=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789AZDOabcd
+"@
 }
 
-try {
-    az account show | Out-Null
-} catch {
-    throw "Azure CLI is not authenticated. Run 'az login' first."
+function Get-UserProfilePath {
+    if ($env:USERPROFILE) {
+        return $env:USERPROFILE
+    }
+
+    $profilePath = [Environment]::GetFolderPath('UserProfile')
+    if ($profilePath) {
+        return $profilePath
+    }
+
+    if ($HOME) {
+        return $HOME
+    }
+
+    throw 'Unable to resolve the user profile directory. On Windows, USERPROFILE must be set. On Linux/macOS, HOME must be set.'
 }
 
-try {
-    az boards -h | Out-Null
-} catch {
-    throw "Azure DevOps CLI extension is not available. Run 'az extension add --name azure-devops' first."
+function Throw-PatFileError {
+    param([string]$PatFile)
+
+    [Console]::Error.WriteLine((Get-PatFileErrorMessage -PatFile $PatFile))
+    throw 'Azure DevOps PAT configuration file was not found or is invalid. See setup instructions above.'
 }
 
-function Invoke-AzJson {
+function Get-AzureDevOpsPat {
+    $userProfile = Get-UserProfilePath
+    $patFile = Join-Path $userProfile '.config\linksoft-skills\azure-devops.env'
+    if (-not (Test-Path -LiteralPath $patFile -PathType Leaf)) {
+        Throw-PatFileError -PatFile $patFile
+    }
+
+    $lines = @(Get-Content -LiteralPath $patFile | ForEach-Object { $_.Trim() })
+
+    if ($lines.Count -ne 1 -or -not $lines[0].StartsWith('AZURE_DEVOPS_PAT=')) {
+        Throw-PatFileError -PatFile $patFile
+    }
+
+    $value = $lines[0].Substring('AZURE_DEVOPS_PAT='.Length).Trim()
+    if (-not $value -or ($value.StartsWith('"') -and $value.EndsWith('"')) -or ($value.StartsWith("'") -and $value.EndsWith("'"))) {
+        Throw-PatFileError -PatFile $patFile
+    }
+
+    return [pscustomobject]@{
+        Pat = $value
+        Path = $patFile
+    }
+}
+
+function Invoke-AdoRestJson {
     param(
         [Parameter(Mandatory = $true)]
-        [string[]]$Arguments
+        [string]$Uri,
+        [Parameter(Mandatory = $true)]
+        [string]$Pat
     )
 
-    $output = & az @Arguments 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        throw (($output | Out-String).Trim())
+    $auth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(":" + $Pat))
+    try {
+        return Invoke-RestMethod -Method Get -Uri $Uri -Headers @{ Authorization = "Basic $auth"; Accept = 'application/json' }
+    } catch {
+        $message = $_.Exception.Message
+        if ($_.ErrorDetails -and $_.ErrorDetails.Message) {
+            $message = $_.ErrorDetails.Message
+        }
+        throw "Azure DevOps REST API request failed: $Uri`n$message"
     }
-    return ($output | Out-String | ConvertFrom-Json)
 }
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$patConfig = Get-AzureDevOpsPat
 
 if (-not $Org -or -not $Project) {
     $context = & "$scriptDir/infer-azure-devops-context.ps1" -RepoRoot $RepoRoot -RemoteName $RemoteName | ConvertFrom-Json
@@ -52,12 +134,10 @@ if (-not $Org -or -not $Project) {
     }
 }
 
-$orgUrl = if ($context.collectionUri) { $context.collectionUri } else { "https://dev.azure.com/$Org" }
-
-az devops configure --defaults organization="$orgUrl" project="$Project" | Out-Null
+$orgUrl = if ($context.collectionUri) { $context.collectionUri.TrimEnd('/') } else { "https://dev.azure.com/$Org" }
 
 $wiql = "SELECT [System.Id], [System.Title], [System.State] FROM WorkItems WHERE [System.Id] = $WorkItemId ORDER BY [System.ChangedDate] DESC"
-$fields = "System.Id,System.Title,System.WorkItemType,System.State,System.Reason,System.Description,Microsoft.VSTS.Common.AcceptanceCriteria,Microsoft.VSTS.TCM.ReproSteps,System.AssignedTo,System.CreatedBy,System.AreaPath,System.IterationPath,System.Tags,System.ChangedDate,System.CreatedDate,System.CommentCount,Microsoft.VSTS.Common.Priority,Microsoft.VSTS.Common.ValueArea,Microsoft.VSTS.Common.BusinessValue"
+$encodedProject = [System.Uri]::EscapeDataString($Project)
 
 function Convert-HtmlToText {
     param([string]$Value)
@@ -95,7 +175,7 @@ function Get-NormalizedComments {
     $items = @()
     foreach ($comment in ($CommentData.comments | ForEach-Object { $_ })) {
         $items += [pscustomobject]@{
-            id = $comment.id
+            id = if ($comment.id) { $comment.id } else { $comment.commentId }
             text = Convert-HtmlToText $comment.text
             createdDate = $comment.createdDate
             modifiedDate = $comment.modifiedDate
@@ -113,9 +193,12 @@ $depth = 0
 while ($currentId -and -not $visited.Contains($currentId) -and $depth -lt $MaxParentDepth) {
     [void]$visited.Add($currentId)
 
-    $item = Invoke-AzJson -Arguments @('boards','work-item','show','--id',"$currentId",'--org',"$orgUrl",'--fields',"$fields",'--expand','none','--output','json')
-    $relation = Invoke-AzJson -Arguments @('boards','work-item','relation','show','--id',"$currentId",'--org',"$orgUrl",'--output','json')
-    $comments = Invoke-AzJson -Arguments @('devops','invoke','--organization',"$orgUrl",'--area','wit','--resource','comments','--route-parameters',"project=$Project","workItemId=$currentId",'--api-version','7.1-preview','--output','json')
+    $itemUrl = "$orgUrl/$encodedProject/_apis/wit/workitems/$currentId`?`$expand=relations&api-version=7.1"
+    $commentsUrl = "$orgUrl/$encodedProject/_apis/wit/workItems/$currentId/comments`?`$top=200&order=asc&api-version=7.1-preview.4"
+
+    $item = Invoke-AdoRestJson -Uri $itemUrl -Pat $patConfig.Pat
+    $relation = $item
+    $comments = Invoke-AdoRestJson -Uri $commentsUrl -Pat $patConfig.Pat
 
     $fieldsData = $item.fields
     $parentId = Get-ParentIdFromRelations $relation
@@ -184,8 +267,14 @@ $markdownSections = foreach ($item in $topDown) {
     workItemId = $WorkItemId
     organization = $orgUrl
     project = $Project
-    defaultsConfigured = $true
-    wiql = Invoke-AzJson -Arguments @('boards','query','--wiql',"$wiql",'--org',"$orgUrl",'--project',"$Project",'--output','json')
+    defaultsConfigured = $false
+    retrieval = [ordered]@{
+        method = 'Azure DevOps REST API'
+        workItemEndpoint = '/_apis/wit/workitems/{id}?$expand=relations&api-version=7.1'
+        commentsEndpoint = '/_apis/wit/workItems/{id}/comments?api-version=7.1-preview.4'
+        patFile = '%USERPROFILE%\.config\linksoft-skills\azure-devops.env'
+    }
+    wiql = $wiql
     hierarchy = $topDown
     structuredMarkdown = ($markdownSections -join "`n`n").Trim()
 } | ConvertTo-Json -Depth 14

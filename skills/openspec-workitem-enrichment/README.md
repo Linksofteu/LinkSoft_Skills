@@ -23,24 +23,52 @@ Typical requests:
 
 This skill now uses:
 
-- `az login` for authentication
-- `az boards` commands from the Azure DevOps CLI extension
-- `az devops invoke` for comment retrieval
-- `az devops configure --defaults ...` after inferring org and project from git
+- direct Azure DevOps REST API calls for work item retrieval
+- a local PAT file for authentication
+- expanded work item relations to walk the parent hierarchy
+- the comments REST endpoint for comment retrieval
 
-This skill no longer depends on Azure DevOps MCP or direct REST calls.
+This skill no longer depends on Azure DevOps MCP or Azure CLI work item commands.
 
-If login is required, the user should be told to run exactly:
-
-```bash
-az login
-```
-
-If the Azure DevOps extension is missing, the user should be told to run exactly:
+On Unix-like systems, create this exact file:
 
 ```bash
-az extension add --name azure-devops
+~/.config/linksoft-skills/azure-devops.env
 ```
+
+On Windows PowerShell, create this exact file:
+
+```powershell
+%USERPROFILE%\.config\linksoft-skills\azure-devops.env
+```
+
+For Windows users, expand `%USERPROFILE%` to your actual profile folder, for example `C:\Users\YourName`. Then:
+
+1. Create the directory `C:\Users\YourName\.config\linksoft-skills`.
+2. Inside that directory, create a file named exactly `azure-devops.env`.
+3. Put exactly one line in the file:
+
+   ```text
+   AZURE_DEVOPS_PAT=<your Azure DevOps PAT>
+   ```
+
+4. Replace `<your Azure DevOps PAT>` with the actual token and save the file.
+
+The file must contain exactly one line:
+
+```text
+AZURE_DEVOPS_PAT=<your Azure DevOps PAT>
+```
+
+Do not add quotes around the token. Do not commit this file to git.
+
+When creating the PAT in Azure DevOps, grant the minimum required scope:
+
+```text
+Work Items: Read
+```
+
+This corresponds to the Azure DevOps REST API `vso.work` permission, which allows reading work items, comments, queries, boards, area paths, and iteration paths. The token does not need write permissions, Code permissions, Build permissions, Packaging permissions, or full access for this skill.
 
 ## What it does
 
@@ -49,13 +77,10 @@ When invoked, the skill:
 - validates the required spec naming pattern
 - extracts the Azure DevOps work item id from the spec name
 - tries to infer Azure DevOps org and project from the local git origin
-- verifies Azure CLI is installed and authenticated
-- verifies the Azure DevOps CLI extension is available
-- configures Azure DevOps defaults automatically from inferred org and project
-- uses WIQL through `az boards query` to confirm the work item exists in the target project
-- fetches detailed work item fields through `az boards work-item show`
-- fetches comments through `az devops invoke`
-- follows parent relations through `az boards work-item relation show` up to the topmost parent
+- verifies the local PAT file exists and is correctly shaped
+- fetches detailed work item fields through the Azure DevOps REST API
+- fetches comments through the Azure DevOps comments REST API
+- follows expanded parent relations up to the topmost parent
 - emits structured hierarchy output from topmost parent to requested work item
 - uses that data to enrich the new OpenSpec spec
 - keeps traceability back to the original Azure DevOps work item
@@ -72,9 +97,6 @@ The skill includes reusable helper scripts:
 ### Bash example
 
 ```bash
-az login
-az extension add --name azure-devops
-
 ./skills/openspec-workitem-enrichment/scripts/fetch-work-item-context.sh \
   --work-item-id 12345
 ```
@@ -82,9 +104,6 @@ az extension add --name azure-devops
 ### PowerShell example
 
 ```powershell
-az login
-az extension add --name azure-devops
-
 ./skills/openspec-workitem-enrichment/scripts/fetch-work-item-context.ps1 \
   -WorkItemId 12345
 ```
@@ -119,9 +138,9 @@ For automatic enrichment, these need to be available:
 
 - a new OpenSpec spec request
 - a spec name in the required format `wi-<id>-<change-name>`
-- Azure CLI installed
-- Azure CLI authenticated with `az login`
-- Azure DevOps CLI extension available (`az extension add --name azure-devops`)
+- a local PAT file at `~/.config/linksoft-skills/azure-devops.env` on Unix-like systems, or `%USERPROFILE%\.config\linksoft-skills\azure-devops.env` on Windows
+- exactly one line in the PAT file: `AZURE_DEVOPS_PAT=<your Azure DevOps PAT>`
+- a PAT with the Azure DevOps `Work Items: Read` scope
 - access to the Azure DevOps org and project
 - a repository git origin that allows Azure DevOps org/project inference, or focused user input for the missing values
 

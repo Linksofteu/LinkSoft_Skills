@@ -4,7 +4,7 @@
     {
       "id": 1,
       "prompt": "Create a new OpenSpec spec named wi-12345-add-customer-export and pull everything useful from Azure DevOps so I do not have to type it again.",
-      "expected_output": "The skill triggers, validates the name, extracts work item 12345, infers Azure DevOps org and project from git origin when possible, verifies Azure CLI auth and az boards availability, configures Azure DevOps defaults, uses WIQL plus Azure CLI commands to fetch the target work item, comments, and parent hierarchy, and enriches the new spec from that data.",
+      "expected_output": "The skill triggers, validates the name, extracts work item 12345, infers Azure DevOps org and project from git origin when possible, verifies the local PAT file exists and is correctly shaped, uses Azure DevOps REST API calls to fetch the target work item, comments, and parent hierarchy, and enriches the new spec from that data.",
       "files": [
         "SKILL.md"
       ],
@@ -12,8 +12,8 @@
         "The response uses the openspec-workitem-enrichment skill for a new OpenSpec spec request with the required naming pattern.",
         "The response extracts the numeric work item id from the spec name rather than asking the user to provide it again.",
         "The response tries to infer the Azure DevOps org and project from git origin before asking the user for them.",
-        "The response uses Azure CLI auth and az boards commands rather than Azure DevOps MCP or direct REST calls.",
-        "The response includes WIQL confirmation before or as part of the detailed fetch flow.",
+        "The response uses Azure DevOps REST API calls with the local PAT file rather than Azure DevOps MCP or Azure CLI work item commands.",
+        "The response verifies the PAT file path and shape before attempting retrieval.",
         "The response incorporates traceability back to the Azure DevOps work item.",
         "The response includes comments and parent hierarchy when available."
       ]
@@ -34,14 +34,14 @@
     {
       "id": 3,
       "prompt": "Create a new OpenSpec spec wi-77889-fix-invoice-rounding from Azure DevOps, but only ask me questions if the work item leaves critical gaps.",
-      "expected_output": "The skill infers Azure DevOps org and project from git origin when possible, uses Azure CLI auth, verifies az boards availability, fetches the work item, comments, and parent chain through Azure CLI, enriches the spec from that data, and limits follow-up questions to unresolved critical gaps.",
+      "expected_output": "The skill infers Azure DevOps org and project from git origin when possible, verifies the local PAT file, fetches the work item, comments, and parent chain through the Azure DevOps REST API, enriches the spec from that data, and limits follow-up questions to unresolved critical gaps.",
       "files": [
         "SKILL.md"
       ],
       "assertions": [
         "The response attempts Azure DevOps org and project inference from git origin before asking the user.",
-        "The response prefers sourced Azure CLI data rather than deriving details from the spec slug.",
-        "The response avoids Azure DevOps MCP and direct REST for the enrichment flow.",
+        "The response prefers sourced Azure DevOps REST API data rather than deriving details from the spec slug.",
+        "The response avoids Azure DevOps MCP and Azure CLI work item commands for the enrichment flow.",
         "The response avoids asking the user to re-enter work item fields that should be available from Azure DevOps.",
         "The response distinguishes sourced work item details from inferred content.",
         "The response captures unresolved gaps explicitly when the work item is sparse."
@@ -49,14 +49,15 @@
     },
     {
       "id": 4,
-      "prompt": "Create a new OpenSpec spec named wi-54321-improve-order-audit-log, but Azure CLI is not logged in yet. Handle that properly.",
-      "expected_output": "The skill checks for Azure CLI auth, explains that `az login` is required, does not pretend enrichment worked, and offers a manual fallback only if Azure CLI-based enrichment cannot proceed.",
+      "prompt": "Create a new OpenSpec spec named wi-54321-improve-order-audit-log, but the PAT file is missing. Handle that properly.",
+      "expected_output": "The skill checks for the PAT file, explains the exact required path and one-line file contents, does not pretend enrichment worked, and offers a manual fallback only if REST API-based enrichment cannot proceed.",
       "files": [
         "SKILL.md"
       ],
       "assertions": [
-        "The response verifies or accounts for Azure CLI authentication before assuming enrichment can happen.",
-        "The response instructs the user to run `az login` when auth is missing.",
+        "The response verifies or accounts for the local PAT file before assuming enrichment can happen.",
+        "The response gives the exact PAT file path and exact `AZURE_DEVOPS_PAT=<your Azure DevOps PAT>` file shape when the file is missing.",
+        "The response says the PAT should be created with the minimum `Work Items: Read` scope and does not require full access.",
         "The response does not claim that Azure DevOps data was fetched when authentication is unavailable.",
         "The response still preserves the required OpenSpec naming convention behavior."
       ]
@@ -88,31 +89,33 @@
     },
     {
       "id": 7,
-      "prompt": "Create a new OpenSpec spec named wi-24680-improve-billing-export. Use the scripted Azure CLI plus az boards flow instead of Azure DevOps MCP.",
-      "expected_output": "The skill uses the bundled script flow or its equivalent: infer org/project, verify Azure CLI auth, verify az boards availability, configure defaults, confirm the item via WIQL, fetch detailed work item fields, comments, and the parent chain, and avoid Azure DevOps MCP and raw REST entirely.",
+      "prompt": "Create a new OpenSpec spec named wi-24680-improve-billing-export. Use the scripted REST API flow instead of Azure DevOps MCP or az boards.",
+      "expected_output": "The skill uses the bundled script flow or its equivalent: infer org/project, verify the PAT file, fetch detailed work item fields with expanded relations, fetch comments, walk the parent chain, and avoid Azure DevOps MCP and Azure CLI work item commands entirely.",
       "files": [
         "SKILL.md"
       ],
       "assertions": [
         "The response prefers the bundled shell or PowerShell helper scripts when practical.",
-        "The response uses Azure CLI auth and az boards rather than MCP tools or REST.",
-        "The response includes WIQL in the retrieval flow.",
-        "The response uses az devops invoke for comments if needed.",
+        "The response uses the REST API and local PAT file rather than MCP tools or Azure CLI work item commands.",
+        "The response uses expanded work item relations to find parents.",
+        "The response uses the comments REST endpoint for comments.",
         "The response does not derive substantive requirements from the spec slug after lookup trouble."
       ]
     },
     {
       "id": 8,
-      "prompt": "Create a new OpenSpec spec named wi-24680-improve-billing-export, but first detect whether I can use az and whether az boards is available. If az boards is missing, tell me exactly what to install.",
-      "expected_output": "The skill checks for Azure CLI first, then checks whether the Azure DevOps extension is available through az boards, and instructs the user to run `az extension add --name azure-devops` if needed before attempting enrichment.",
+      "prompt": "Create a new OpenSpec spec named wi-24680-improve-billing-export, but first detect whether the PAT file is configured. If it is missing, tell me exactly where to put it.",
+      "expected_output": "The skill checks for the PAT file first and instructs the user to create `~/.config/linksoft-skills/azure-devops.env` on Unix-like systems. On Windows it expands `%USERPROFILE%` to the user's actual profile directory when known, then gives manual instructions to create the `.config\\linksoft-skills` directory, create a file named exactly `azure-devops.env`, and put exactly one line, `AZURE_DEVOPS_PAT=<your Azure DevOps PAT>`, before attempting enrichment. Optional PowerShell commands may appear only after the manual steps.",
       "files": [
         "SKILL.md"
       ],
       "assertions": [
-        "The response checks for Azure CLI before relying on Azure DevOps commands.",
-        "The response checks for az boards availability before enrichment.",
-        "The response tells the user to install the azure-devops extension if az boards is unavailable.",
-        "The response does not fall back to REST or MCP."
+        "The response checks for the PAT file before relying on Azure DevOps REST API retrieval.",
+        "The response names the exact Unix-like PAT file path and expands the Windows user profile path when known.",
+        "The response gives manual Windows setup steps before optional PowerShell commands.",
+        "The response shows the exact one-line PAT file content format.",
+        "The response explains that the PAT needs `Work Items: Read` permission.",
+        "The response does not fall back to Azure CLI work item commands or MCP."
       ]
     },
     {

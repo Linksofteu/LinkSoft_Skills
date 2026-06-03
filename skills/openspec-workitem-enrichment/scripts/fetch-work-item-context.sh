@@ -4,7 +4,7 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Fetch Azure DevOps work item context using Azure CLI and az boards only.
+Fetch Azure DevOps work item context using the Azure DevOps REST API.
 
 Usage:
   fetch-work-item-context.sh --work-item-id ID [options]
@@ -18,8 +18,12 @@ Options:
   --max-parent-depth N   Maximum number of parent levels to follow. Defaults to 10.
   --help                 Show this help text.
 
+Authentication:
+  Requires ~/.config/linksoft-skills/azure-devops.env containing exactly:
+    AZURE_DEVOPS_PAT=<your Azure DevOps PAT>
+
 Output:
-  JSON containing inferred context, WIQL confirmation, the parent chain from
+  JSON containing inferred context, REST retrieval details, the parent chain from
   topmost parent to target work item, comments for each item, and a
   structuredMarkdown field ready for spec enrichment.
 EOF
@@ -81,22 +85,67 @@ if [[ ! "$max_parent_depth" =~ ^[0-9]+$ ]]; then
   exit 2
 fi
 
-for cmd in az python3; do
+for cmd in curl python3; do
   if ! command -v "$cmd" >/dev/null 2>&1; then
     echo "Required command not found: $cmd" >&2
     exit 1
   fi
 done
 
-if ! az account show >/dev/null 2>&1; then
-  echo "Azure CLI is not authenticated. Run 'az login' first." >&2
+pat_file="$HOME/.config/linksoft-skills/azure-devops.env"
+
+pat_file_error() {
+  cat >&2 <<EOF
+Azure DevOps PAT configuration file was not found or is invalid.
+
+Create this exact file:
+  $pat_file
+
+If the directory does not exist, create it with:
+  mkdir -p "$HOME/.config/linksoft-skills"
+
+The file must contain exactly one environment variable assignment, on one line:
+  AZURE_DEVOPS_PAT=<your Azure DevOps PAT>
+
+One way to create the file is:
+  printf 'AZURE_DEVOPS_PAT=<your Azure DevOps PAT>\n' > "$pat_file"
+
+Example file contents:
+  AZURE_DEVOPS_PAT=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789AZDOabcd
+
+Do not add quotes around the token. Do not commit this file to git.
+
+When creating the PAT in Azure DevOps, grant the minimum required scope:
+  Work Items: Read
+
+This corresponds to the Azure DevOps REST API vso.work permission, which allows reading work items, comments, queries, boards, area paths, and iteration paths. The token does not need write permissions, Code permissions, Build permissions, Packaging permissions, or full access for this skill.
+EOF
+}
+
+if [[ ! -f "$pat_file" ]]; then
+  pat_file_error
   exit 1
 fi
 
-if ! az boards -h >/dev/null 2>&1; then
-  echo "Azure DevOps CLI extension is not available. Run 'az extension add --name azure-devops' first." >&2
+azure_devops_pat="$(python3 - "$pat_file" <<'PY'
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+lines = [line.strip() for line in path.read_text(encoding='utf-8').splitlines()]
+if len(lines) != 1 or not lines[0].startswith('AZURE_DEVOPS_PAT='):
+    sys.exit(2)
+value = lines[0].split('=', 1)[1].strip()
+if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
+    sys.exit(2)
+if not value:
+    sys.exit(2)
+print(value)
+PY
+)" || {
+  pat_file_error
   exit 1
-fi
+}
 
 if [[ -z "$org" || -z "$project" ]]; then
   context_json="$($script_dir/infer-azure-devops-context.sh --repo-root "$repo_root" --remote-name "$remote_name")"
@@ -110,18 +159,52 @@ else
   context_json="$(python3 -c 'import json,sys; print(json.dumps({"org": sys.argv[1], "project": sys.argv[2]}, indent=2))' "$org" "$project")"
 fi
 
-org_url="$(python3 -c 'import json,sys; data=json.load(sys.stdin); print(data.get("collectionUri") or ("https://dev.azure.com/" + data["org"]))' <<<"$context_json")"
-
-az devops configure --defaults organization="$org_url" project="$project" >/dev/null
+org_url="$(python3 -c 'import json,sys; data=json.load(sys.stdin); print((data.get("collectionUri") or ("https://dev.azure.com/" + data["org"])).rstrip("/"))' <<<"$context_json")"
 
 wiql="SELECT [System.Id], [System.Title], [System.State] FROM WorkItems WHERE [System.Id] = $work_item_id ORDER BY [System.ChangedDate] DESC"
 
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT
 
-az boards query --wiql "$wiql" --org "$org_url" --project "$project" --output json > "$tmp_dir/wiql.json"
+encoded_project="$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$project")"
 
-fields="System.Id,System.Title,System.WorkItemType,System.State,System.Reason,System.Description,Microsoft.VSTS.Common.AcceptanceCriteria,Microsoft.VSTS.TCM.ReproSteps,System.AssignedTo,System.CreatedBy,System.AreaPath,System.IterationPath,System.Tags,System.ChangedDate,System.CreatedDate,System.CommentCount,Microsoft.VSTS.Common.Priority,Microsoft.VSTS.Common.ValueArea,Microsoft.VSTS.Common.BusinessValue"
+api_get() {
+  local url="$1"
+  local output_file="$2"
+  local status_file="$tmp_dir/http-status.txt"
+  local body_file="$tmp_dir/http-body.txt"
+
+  local status
+  status="$(curl --silent --show-error --location \
+    --user ":$azure_devops_pat" \
+    --header "Accept: application/json" \
+    --output "$body_file" \
+    --write-out "%{http_code}" \
+    "$url")"
+  printf '%s' "$status" > "$status_file"
+
+  if [[ "$status" -lt 200 || "$status" -ge 300 ]]; then
+    echo "Azure DevOps REST API request failed with HTTP $status: $url" >&2
+    python3 - "$body_file" >&2 <<'PY'
+import json
+import pathlib
+import sys
+
+body = pathlib.Path(sys.argv[1]).read_text(encoding='utf-8', errors='replace').strip()
+if not body:
+    sys.exit(0)
+try:
+    data = json.loads(body)
+    message = data.get('message') or data.get('Message') or body
+except Exception:
+    message = body
+print(message)
+PY
+    exit 1
+  fi
+
+  mv "$body_file" "$output_file"
+}
 
 current_id="$work_item_id"
 depth=0
@@ -135,25 +218,12 @@ while [[ -n "$current_id" && "$depth" -lt "$max_parent_depth" ]]; do
 
   seen_ids+=("$current_id")
 
-  az boards work-item show \
-    --id "$current_id" \
-    --org "$org_url" \
-    --fields "$fields" \
-    --expand none \
-    --output json > "$tmp_dir/work-item-$current_id.json"
+  item_url="$org_url/$encoded_project/_apis/wit/workitems/$current_id?%24expand=relations&api-version=7.1"
+  comments_url="$org_url/$encoded_project/_apis/wit/workItems/$current_id/comments?%24top=200&order=asc&api-version=7.1-preview.4"
 
-  az boards work-item relation show \
-    --id "$current_id" \
-    --org "$org_url" \
-    --output json > "$tmp_dir/relation-$current_id.json"
-
-  az devops invoke \
-    --organization "$org_url" \
-    --area wit \
-    --resource comments \
-    --route-parameters project="$project" workItemId="$current_id" \
-    --api-version 7.1-preview \
-    --output json > "$tmp_dir/comments-$current_id.json"
+  api_get "$item_url" "$tmp_dir/work-item-$current_id.json"
+  cp "$tmp_dir/work-item-$current_id.json" "$tmp_dir/relation-$current_id.json"
+  api_get "$comments_url" "$tmp_dir/comments-$current_id.json"
 
   next_id="$(python3 - "$tmp_dir/relation-$current_id.json" <<'PY'
 import json
@@ -179,7 +249,7 @@ PY
   depth=$((depth + 1))
 done
 
-python3 - "$context_json" "$tmp_dir" "$work_item_id" "$org_url" "$project" "$max_parent_depth" <<'PY'
+python3 - "$context_json" "$tmp_dir" "$work_item_id" "$org_url" "$project" "$max_parent_depth" "$wiql" <<'PY'
 import json
 import html
 from html.parser import HTMLParser
@@ -193,6 +263,7 @@ work_item_id = int(sys.argv[3])
 org_url = sys.argv[4]
 project = sys.argv[5]
 max_parent_depth = int(sys.argv[6])
+wiql = sys.argv[7]
 
 class HtmlToText(HTMLParser):
     def __init__(self):
@@ -245,7 +316,7 @@ def normalize_comments(data):
     comments = []
     for comment in data.get('comments', []):
         comments.append({
-            'id': comment.get('id'),
+            'id': comment.get('id') or comment.get('commentId'),
             'text': html_to_text(comment.get('text') or ''),
             'createdDate': comment.get('createdDate'),
             'modifiedDate': comment.get('modifiedDate'),
@@ -325,8 +396,14 @@ result = {
     "workItemId": work_item_id,
     "organization": org_url,
     "project": project,
-    "defaultsConfigured": True,
-    "wiql": load("wiql.json"),
+    "defaultsConfigured": False,
+    "retrieval": {
+        "method": "Azure DevOps REST API",
+        "workItemEndpoint": "/_apis/wit/workitems/{id}?$expand=relations&api-version=7.1",
+        "commentsEndpoint": "/_apis/wit/workItems/{id}/comments?api-version=7.1-preview.4",
+        "patFile": "~/.config/linksoft-skills/azure-devops.env",
+    },
+    "wiql": wiql,
     "hierarchy": chain_top_down,
     "structuredMarkdown": to_markdown(chain_top_down),
 }
