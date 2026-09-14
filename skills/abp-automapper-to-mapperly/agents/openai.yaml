@@ -1,0 +1,4 @@
+interface:
+  display_name: "ABP AutoMapper to Mapperly"
+  short_description: "Migrate ABP mappings to Mapperly safely"
+  default_prompt: "Use $abp-automapper-to-mapperly to migrate this ABP module from AutoMapper to Mapperly."
