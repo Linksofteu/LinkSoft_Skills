@@ -1,0 +1,62 @@
+{
+  "skill_name": "abp-automapper-to-mapperly",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Migrate the Orders.Application ABP module from Volo.Abp.AutoMapper to Mapperly. Its profile maps Order to OrderDto, renames Customer.Id to CustomerId, computes Summary from several Order members, ignores DisplayStatus because an AfterMap fills it, and supports mapping into an existing DTO. Order has Lines, and an OrderLineToOrderLineDtoMapper already exists.",
+      "expected_output": "A scoped implementation that updates ABP registration, reuses the existing line mapper, and replaces the profile with a strict MapperBase mapping while preserving create, update, nested paths, whole-source computation, and enrichment behavior.",
+      "files": [],
+      "assertions": [
+        "Replaces Volo.Abp.AutoMapper registration with Volo.Abp.Mapperly and AddMapperlyObjectMapper for the owning module.",
+        "Uses MapperBase<Order, OrderDto> with both create-new and update-existing mapping methods.",
+        "Constructor-injects OrderLineToOrderLineDtoMapper and exposes the initialized instance to Mapperly with UseMapper instead of duplicating line mapping rules.",
+        "Uses nameof references and represents Order.Customer.Id with a segment array or verified full-nameof syntax instead of treating plain nameof(Order.Customer.Id) as a complete path.",
+        "Uses MapPropertyFromSource with a named helper to compute Summary from the complete Order source.",
+        "Preserves DisplayStatus enrichment rather than merely ignoring it, and does not leave required reusable behavior only in AfterMap.",
+        "Recognizes that AfterMap on OrderLineToOrderLineDtoMapper will not run when the mapper is consumed through UseMapper and moves any required line behavior into a composable user mapping.",
+        "Prevents property-specific user methods from becoming default conversions for unrelated properties.",
+        "Asks whether the user wants behavior tests created and preserves all existing behavior tests regardless of the answer."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Convert an ABP AutoMapper profile that uses ReverseMap, MapExtraProperties, a custom value resolver with an injected formatter, and ProjectTo in an EF Core query. Do not change observable behavior.",
+      "expected_output": "A migration that distinguishes source-generated object mapping from runtime enrichment and query projection, using ABP Mapperly constructs only where behavior is equivalent.",
+      "files": [],
+      "assertions": [
+        "Uses TwoWayMapperBase only after checking that reverse behavior is symmetric, otherwise proposes directional mappers.",
+        "Uses MapExtraProperties for ABP extension properties.",
+        "Handles formatter enrichment explicitly and does not hide asynchronous or contextual work in generated mapping.",
+        "Flags ProjectTo as a separate query-projection rewrite and validates SQL translation."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "As part of upgrading ABP 9 to ABP 10, migrate every AutoMapper profile in this microservice solution to Mapperly. Several profiles map tracked aggregates with child collections, and existing tests only call AssertConfigurationIsValid.",
+      "expected_output": "A staged, inventory-driven migration that separates the ABP upgrade from mapping semantics, protects tracked collection behavior, and asks whether replacement behavior tests should be created.",
+      "files": [],
+      "assertions": [
+        "Inventories modules, profiles, direct AutoMapper APIs, and shared dependencies before removing packages.",
+        "Does not copy package versions or unrelated database/framework changes from another project.",
+        "Asks whether the user wants behavior tests created before changing the test suite.",
+        "If behavior tests are declined, removes only AutoMapper-specific configuration tests and preserves every existing behavioral test.",
+        "Keeps RequiredMappingStrategy.Target by default and resolves or documents every ignored target.",
+        "Removes AutoMapper only after a solution-wide residual scan."
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Two ABP Mapperly mappings convert CustomerCreateDto and CustomerUpdateDto to CustomerModel. Both input DTOs derive from CustomerChangeDto, which owns Code. The update mapping includes the create mapping configuration, which uses NormalizeCode through MapProperty Use, but NormalizeCode exists only in the create mapper class. Refactor this safely without duplicating the helper.",
+      "expected_output": "A composable mapper design that defines the shared configuration for CustomerChangeDto and keeps it with its referenced helper in one discoverable scope.",
+      "files": [],
+      "assertions": [
+        "Warns that IncludeMappingConfiguration reuses mapping attributes but does not copy helper method implementations referenced by Use.",
+        "Places both mapping pairs in one Mapper class that derives from MapperBase<CustomerCreateDto, CustomerModel> and implements IAbpMapperlyMapper<CustomerUpdateDto, CustomerModel>.",
+        "Defines the included mapping configuration for the shared CustomerChangeDto base so it is assignable from both concrete input DTOs.",
+        "Keeps NormalizeCode in the shared class and selects it with Use and nameof.",
+        "Marks the property-specific NormalizeCode helper as UserMapping with Default false when automatic user-mapping discovery is enabled.",
+        "Does not use AfterMap as a substitute for reusable normalization behavior."
+      ]
+    }
+  ]
+}
