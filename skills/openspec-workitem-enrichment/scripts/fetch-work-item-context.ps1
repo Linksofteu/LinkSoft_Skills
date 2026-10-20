@@ -5,7 +5,8 @@ param(
     [string]$Project,
     [string]$RepoRoot = (Get-Location).Path,
     [string]$RemoteName = "origin",
-    [int]$MaxParentDepth = 10
+    [int]$MaxParentDepth = 10,
+    [string]$DownloadImages
 )
 
 $ErrorActionPreference = 'Stop'
@@ -121,6 +122,11 @@ function Invoke-AdoRestJson {
 }
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+if ($DownloadImages) {
+    if (-not (Get-Command python3 -ErrorAction SilentlyContinue)) {
+        throw 'python3 is required when -DownloadImages is set.'
+    }
+}
 $patConfig = Get-AzureDevOpsPat
 
 if (-not $Org -or -not $Project) {
@@ -171,9 +177,17 @@ function Get-ParentIdFromRelations {
 }
 
 function Get-NormalizedComments {
-    param($CommentData)
+    param($CommentData, [int]$ItemId)
     $items = @()
     foreach ($comment in ($CommentData.comments | ForEach-Object { $_ })) {
+        if ($DownloadImages) {
+            $imageSources.Add([pscustomobject]@{
+                workItemId = $ItemId
+                sourceField = 'comment'
+                commentId = if ($comment.id) { $comment.id } else { $comment.commentId }
+                html = $comment.text
+            })
+        }
         $items += [pscustomobject]@{
             id = if ($comment.id) { $comment.id } else { $comment.commentId }
             text = Convert-HtmlToText $comment.text
@@ -186,6 +200,7 @@ function Get-NormalizedComments {
 }
 
 $chain = New-Object System.Collections.Generic.List[object]
+$imageSources = New-Object System.Collections.Generic.List[object]
 $visited = New-Object System.Collections.Generic.HashSet[int]
 $currentId = $WorkItemId
 $depth = 0
@@ -202,6 +217,17 @@ while ($currentId -and -not $visited.Contains($currentId) -and $depth -lt $MaxPa
 
     $fieldsData = $item.fields
     $parentId = Get-ParentIdFromRelations $relation
+
+    if ($DownloadImages) {
+        foreach ($fieldName in @('System.Description', 'Microsoft.VSTS.Common.AcceptanceCriteria', 'Microsoft.VSTS.TCM.ReproSteps')) {
+            $imageSources.Add([pscustomobject]@{
+                workItemId = $item.id
+                sourceField = $fieldName
+                commentId = $null
+                html = $fieldsData.$fieldName
+            })
+        }
+    }
 
     $chain.Add([pscustomobject]@{
         id = $item.id
@@ -225,7 +251,7 @@ while ($currentId -and -not $visited.Contains($currentId) -and $depth -lt $MaxPa
         reproSteps = Convert-HtmlToText $fieldsData.'Microsoft.VSTS.TCM.ReproSteps'
         commentCount = $fieldsData.'System.CommentCount'
         parentId = $parentId
-        comments = Get-NormalizedComments $comments
+        comments = Get-NormalizedComments $comments -ItemId $item.id
     })
 
     $currentId = $parentId
@@ -250,6 +276,12 @@ $markdownSections = foreach ($item in $topDown) {
         $parts.Add("")
     }
 
+    if (-not [string]::IsNullOrWhiteSpace($item.reproSteps)) {
+        $parts.Add("### Repro Steps")
+        $parts.Add($item.reproSteps)
+        $parts.Add("")
+    }
+
     if ($item.comments.Count -gt 0) {
         $parts.Add("### Comments")
         ($item.comments | ForEach-Object {
@@ -262,7 +294,7 @@ $markdownSections = foreach ($item in $topDown) {
     ($parts -join "`n").Trim()
 }
 
-[ordered]@{
+$output = [ordered]@{
     context = $context
     workItemId = $WorkItemId
     organization = $orgUrl
@@ -277,4 +309,14 @@ $markdownSections = foreach ($item in $topDown) {
     wiql = $wiql
     hierarchy = $topDown
     structuredMarkdown = ($markdownSections -join "`n`n").Trim()
-} | ConvertTo-Json -Depth 14
+}
+
+if ($DownloadImages) {
+    $output.imageSources = @($imageSources.ToArray())
+    $output | ConvertTo-Json -Depth 14 | python3 "$scriptDir/download-work-item-images.py" --output-dir $DownloadImages --org-url $orgUrl --pat-file $patConfig.Path
+    if ($LASTEXITCODE -ne 0) {
+        throw "Work item image download helper failed with exit code $LASTEXITCODE."
+    }
+} else {
+    $output | ConvertTo-Json -Depth 14
+}

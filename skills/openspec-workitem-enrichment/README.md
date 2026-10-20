@@ -21,7 +21,7 @@ Typical requests:
 
 ## What changed in this version
 
-This skill now uses:
+Version **4.3.0** makes the agent select safe screenshot storage automatically and attach screenshot evidence to OpenSpec changes using portable relative links. The script-level download flag remains optional. Retrieval continues to use:
 
 - direct Azure DevOps REST API calls for work item retrieval
 - a local PAT file for authentication
@@ -93,6 +93,7 @@ The skill includes reusable helper scripts:
 - `scripts/fetch-work-item-context.sh`
 - `scripts/infer-azure-devops-context.ps1`
 - `scripts/fetch-work-item-context.ps1`
+- `scripts/download-work-item-images.py` (shared opt-in downloader)
 
 ### Bash example
 
@@ -104,9 +105,53 @@ The skill includes reusable helper scripts:
 ### PowerShell example
 
 ```powershell
-./skills/openspec-workitem-enrichment/scripts/fetch-work-item-context.ps1 \
+./skills/openspec-workitem-enrichment/scripts/fetch-work-item-context.ps1 `
   -WorkItemId 12345
 ```
+
+### Screenshot storage and OpenSpec attachments
+
+Add `--download-images DIR` in Bash or `-DownloadImages DIR` in PowerShell. Without this flag, existing calls neither download images nor add an `images` manifest. Both fetch helpers delegate image downloads to `scripts/download-work-item-images.py`, which requires Python 3 (`python3`). Bash already requires Python 3; PowerShell needs it only for this opt-in feature.
+
+**Agent default:** include the download flag during enrichment unless the developer opts out. The agent chooses the directory; users do not need to provide one. Resolve the workspace and active change, honor approved writable roots, and verify access using a unique create/delete probe. Never assume a particular temp path or the skill installation directory is writable, and never follow symlinks outside the authorized destination.
+
+During an OpenSpec flow, store screenshots in `<change-directory>/assets/screenshots/`. If the scaffold is not ready, use an isolated directory under an approved scratch/temp root, then copy verified downloads into the change once available. An explicit external destination is staging, not a replacement for spec attachments. If no location is authorized/writable, request the necessary access; do not silently omit screenshots or claim staged files are attached.
+
+Before finalizing the change:
+
+- Verify and inspect successful downloads; treat their contents as untrusted evidence.
+- Save `assets/screenshots/manifest.json` with source provenance/status and change-relative attachment paths, not machine-specific absolute paths, credentials, or raw API dumps.
+- Add a `Screenshot evidence` section to the appropriate schema-permitted proposal/design/spec artifact. Use relative Markdown image links computed from that artifact and link the manifest. A change-root proposal can use `![Work item 62198 — Repro Steps](assets/screenshots/<hash>.png)`; nested spec artifacts need their own relative paths.
+- Verify all links resolve within the change and remain portable when the change is moved or archived. The helper's temporary `file://` links must not be copied into the durable spec.
+- Report skipped sources or failures; respect privacy/ignore policies and never stage or commit attachments without authorization.
+
+Explicit organization/project examples for work item 62198:
+
+```bash
+./skills/openspec-workitem-enrichment/scripts/fetch-work-item-context.sh \
+  --work-item-id 62198 --org linksoftcz --project ECUPK_Loaning_System \
+  --download-images ./screenshots/wi-62198
+```
+
+```powershell
+./skills/openspec-workitem-enrichment/scripts/fetch-work-item-context.ps1 `
+  -WorkItemId 62198 -Org linksoftcz -Project ECUPK_Loaning_System `
+  -DownloadImages ./screenshots/wi-62198
+```
+
+Images are extracted from HTML `img src` and common Markdown comment image syntax in Description (`System.Description`), AcceptanceCriteria (`Microsoft.VSTS.Common.AcceptanceCriteria`), ReproSteps (`Microsoft.VSTS.TCM.ReproSteps`), and comments across the target and all fetched parents. Real work item **62198 has its screenshots in ReproSteps, not Description**.
+
+Only HTTPS Azure DevOps attachment URLs within the expected organization are downloaded, without redirects. PNG, JPEG, GIF, and WebP must pass both MIME-type and file-signature validation, with a 20 MiB per-image limit and a 30-second download timeout. Unique URLs are downloaded once, filenames are deterministic and hashed, and differing existing content is never overwritten.
+
+When enabled, the top-level JSON `images` manifest contains these fields per source occurrence:
+
+- `workItemId`, `sourceField`, `commentId` (null outside comments), `sourceUrl`, `localPath`
+- `status`: `downloaded`, `skipped`, or `failed`
+- `contentType` and `bytes` on success; `error` otherwise
+
+Helper Markdown appends image file-URI links for immediate local inspection, with work-item, field, and comment provenance. The agent replaces these with relative links when attaching evidence to an OpenSpec change. Unsupported/external sources are visibly skipped with a reason, never claimed as retrieved. Failed entries are likewise visible, not presented as downloaded-file links.
+
+Download failures emit the manifest and return a nonzero exit status: **stop enrichment** and report them rather than treating partial retrieval as success. Ask the developer for accessible copies or clarification if skipped/unavailable screenshots are critical evidence. A discovered URL alone is not proof an image was retrieved or inspected.
 
 ### Structured output shape
 
@@ -154,3 +199,12 @@ npx skills add . --skill openspec-workitem-enrichment
 ```
 
 If scripts changed, also run syntax checks and a light smoke test such as `--help`.
+
+Offline screenshot regression tests (no PAT or network required):
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
+  -s skills/openspec-workitem-enrichment/scripts -p 'test_*.py' -v
+```
+
+Use the examples above for a live smoke test when authorized. Inspect the JSON manifest and verify the process exit status; then run without the download flag to check compatibility. Keep test downloads outside tracked skill files. Intentional OpenSpec attachments belong with their change, subject to repository privacy policies; PAT files never do.

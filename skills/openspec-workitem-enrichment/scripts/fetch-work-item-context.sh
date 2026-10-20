@@ -16,6 +16,7 @@ Options:
   --repo-root PATH       Repository root for git remote inference. Defaults to current directory.
   --remote-name NAME     Git remote name to inspect. Defaults to origin.
   --max-parent-depth N   Maximum number of parent levels to follow. Defaults to 10.
+  --download-images DIR Download embedded screenshots to DIR (optional).
   --help                 Show this help text.
 
 Authentication:
@@ -36,6 +37,7 @@ work_item_id=""
 org=""
 project=""
 max_parent_depth=10
+download_images=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -61,6 +63,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --max-parent-depth)
       max_parent_depth="$2"
+      shift 2
+      ;;
+    --download-images)
+      download_images="${2:?--download-images requires a directory}"
       shift 2
       ;;
     --help|-h)
@@ -249,7 +255,7 @@ PY
   depth=$((depth + 1))
 done
 
-python3 - "$context_json" "$tmp_dir" "$work_item_id" "$org_url" "$project" "$max_parent_depth" "$wiql" <<'PY'
+python3 - "$context_json" "$tmp_dir" "$work_item_id" "$org_url" "$project" "$max_parent_depth" "$wiql" "$download_images" > "$tmp_dir/context.json" <<'PY'
 import json
 import html
 from html.parser import HTMLParser
@@ -264,6 +270,7 @@ org_url = sys.argv[4]
 project = sys.argv[5]
 max_parent_depth = int(sys.argv[6])
 wiql = sys.argv[7]
+download_images = sys.argv[8]
 
 class HtmlToText(HTMLParser):
     def __init__(self):
@@ -357,6 +364,7 @@ def to_markdown(items):
         blocks.append(f"## {item.get('type') or 'Work Item'}: {item.get('title') or 'Untitled'} (#{item.get('id')})")
         description = item.get('description') or ''
         acceptance = item.get('acceptanceCriteria') or ''
+        repro = item.get('reproSteps') or ''
         comments = item.get('comments') or []
         if description:
             blocks.append("### Description")
@@ -373,6 +381,8 @@ def to_markdown(items):
                 created = comment.get('createdDate') or 'Unknown date'
                 text = comment.get('text') or ''
                 blocks.append(f"- {author} ({created}): {text}")
+        if repro:
+            blocks.extend(["### Repro Steps", repro, ""])
         blocks.append("")
     return '\n'.join(blocks).strip()
 
@@ -408,5 +418,23 @@ result = {
     "structuredMarkdown": to_markdown(chain_top_down),
 }
 
+if download_images:
+    sources = []
+    for summary in chain_top_down:
+        item_id = summary['id']
+        fields = load(f'work-item-{item_id}.json').get('fields', {})
+        for field in ('System.Description', 'Microsoft.VSTS.Common.AcceptanceCriteria', 'Microsoft.VSTS.TCM.ReproSteps'):
+            sources.append(dict(workItemId=item_id, sourceField=field, commentId=None, html=fields.get(field, '')))
+        for comment in load(f'comments-{item_id}.json').get('comments', []):
+            sources.append(dict(workItemId=item_id, sourceField='comment', commentId=comment.get('id') or comment.get('commentId'), html=comment.get('text', '')))
+    result['imageSources'] = sources
+
 print(json.dumps(result, indent=2))
 PY
+
+if [[ -n "$download_images" ]]; then
+  python3 "$script_dir/download-work-item-images.py" --output-dir "$download_images" \
+    --org-url "$org_url" --pat-file "$pat_file" < "$tmp_dir/context.json"
+else
+  cat "$tmp_dir/context.json"
+fi
