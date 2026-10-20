@@ -9,6 +9,9 @@ Read-only retrieval of SonarQube issues and security hotspots for a branch or PR
 - `scripts/test_fetch_findings.py`: offline regression tests.
 - `evals/evals.json`: agent workflow evaluation cases.
 
+## Create a Sonar token in SonarQube
+Open SonarQube and click your profile icon in the upper right portion of the screen. Click it and click "My Account". My Account screen, open the "Security" tab and generate a token. If you then place the token in a file accessible by your harness or add it as an environment variable as described below, the agent will be able to use it to access SonarQube analysis.
+
 ## Credentials and portability
 
 Configure `SONAR_TOKEN` through your existing secret manager/environment, or provide a UTF-8 token file. Do not put token values in shell commands or chat. No fixed secret-file location is required. An explicit `--token-file` takes precedence over environment configuration; otherwise `SONAR_TOKEN` takes precedence over `SONAR_TOKEN_FILE`.
