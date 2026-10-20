@@ -1,0 +1,23 @@
+{
+  "skill_name": "sonar-findings",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Fetch all Sonar findings for my current branch from https://sonar.example.com, project Example. SONAR_TOKEN is already configured. Wait for my instructions afterward.",
+      "expected_output": "Detects branch, checks branch and PR analyses, retrieves all pages of issues and hotspots read-only, reports scope, counts and output path without printing credentials.",
+      "assertions": ["No mutation requests", "Includes resolved issues", "Does not silently use main", "Reports permission failures as partial"]
+    },
+    {
+      "id": 2,
+      "prompt": "On Windows, fetch PR 123 findings for Example at https://sonar.example.com. My token file is C:\\Users\\dev\\secrets\\sonar-token.txt.",
+      "expected_output": "Uses py -3 and the supplied token path without displaying its contents; output defaults to the OS temporary directory.",
+      "assertions": ["No hard-coded /tmp path", "No token in command arguments", "Selects PR 123 explicitly"]
+    },
+    {
+      "id": 3,
+      "prompt": "Get findings for feature/example. The server has two matching PR analyses and hotspots may require more permissions.",
+      "expected_output": "Asks which PR analysis to retrieve; does not silently choose. If hotspots are forbidden, retains issues and reports partial retrieval.",
+      "assertions": ["Ambiguity is surfaced", "No permission bypass", "No false completeness claim"]
+    }
+  ]
+}
